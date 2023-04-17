@@ -17,6 +17,7 @@ public:
     float* get() const;
     void print() const;
     void cpu(TensorCPU& tensor_cpu);
+    bool equal(const TensorCUDA& _tensor);
 };
 
 class TensorIntCUDA{

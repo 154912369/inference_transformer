@@ -85,14 +85,56 @@ void TensorCUDA::print() const{
         printf("%d ",_shape[i]);
     }
     printf("\n");
+    int first_size = _shape[0];
+    first_size= first_size <5 ? first_size:5;
     int second_size = _value_size/_shape[0];
-    for(int i=0;i<_shape[0];i++){
+    second_size = second_size <10 ?second_size:10;
+
+    for(int i=0;i<first_size;i++){
         for(int j=0;j<second_size ;j++){
-            printf("%.3f ",tmp_value[i*second_size+j]);
+            printf("%.5f ",tmp_value[i*second_size+j]);
         }
          printf("\n");
     }
     delete[] tmp_value;
+
+}
+
+bool TensorCUDA::equal(const TensorCUDA& tensor){
+    std::vector<int> shape = tensor.get_shape();
+    if(shape.size() != _shape.size()){
+        return false;
+    }
+    for(int i =0; i<_shape.size();i++){
+        if(shape[i]!=_shape[i]){
+            return false;
+        }
+    }
+
+    float* tmp_value = new float[_value_size];
+    cudaError_t cudaStatus = cudaMemcpy( tmp_value, _device_value_ptr, _value_size * sizeof(float), cudaMemcpyDeviceToHost);
+    if (cudaStatus != cudaSuccess) {
+        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+
+    float* tmp_value_1 = new float[_value_size];
+    cudaStatus = cudaMemcpy( tmp_value_1, tensor.get(), _value_size * sizeof(float), cudaMemcpyDeviceToHost);
+    if (cudaStatus != cudaSuccess) {
+        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+    for(int i =0;i<_value_size;i++){
+        if(abs(tmp_value[i]-tmp_value_1[i])>0.00001){
+            printf("diff is %d : %f, %f\n", i, tmp_value[i],tmp_value_1[i] );
+            delete[] tmp_value;
+            delete[] tmp_value_1;
+            return false;
+        }
+    }
+    delete[] tmp_value;
+    delete[] tmp_value_1;
+    return true;
 
 }
 
