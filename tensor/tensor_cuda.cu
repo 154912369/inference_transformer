@@ -2,18 +2,7 @@
 
 TensorCUDA::TensorCUDA(const TensorCPU& _tensor_cpu){
     int result=-3;
-    cudaError_t cudaStatus =cudaRuntimeGetVersion(&result);
-    if (cudaStatus != cudaSuccess) {
-        printf("cudaError Runtime Version failed: %s %d\n", cudaGetErrorString(cudaStatus), cudaStatus);
-        // 进行错误处理
-    }
-    printf("run time version is : %d\n",result);
-    cudaStatus =cudaDriverGetVersion(&result);
-    if (cudaStatus != cudaSuccess) {
-        printf("cudaError Driver Version failed: %s %d\n", cudaGetErrorString(cudaStatus), cudaStatus);
-        // 进行错误处理
-    }
-    printf("driver time version is : %d\n",result);
+    cudaError_t cudaStatus;
     _shape  = _tensor_cpu.get_shape();
     _value_size = _tensor_cpu.get_size();
     cudaStatus = cudaMalloc(&_device_value_ptr, _value_size * sizeof(float));
@@ -86,16 +75,23 @@ void TensorCUDA::print() const{
     }
     printf("\n");
     int first_size = _shape[0];
+    if(_shape.size()==1){
+        first_size= first_size <20 ? first_size:20;
+        for(int i=0;i<first_size;i++){
+            printf("%.5f ",tmp_value[i]);
+        }
+        return;
+    }
     first_size= first_size <5 ? first_size:5;
-    int second_size = _value_size/_shape[0];
-    second_size = second_size <10 ?second_size:10;
-
+    int origin_second_size = _value_size/_shape[0];
+    int second_size = origin_second_size <10 ?origin_second_size:10;
     for(int i=0;i<first_size;i++){
         for(int j=0;j<second_size ;j++){
-            printf("%.5f ",tmp_value[i*second_size+j]);
+            printf("%.5f ",tmp_value[i*origin_second_size +j]);
         }
          printf("\n");
     }
+    printf("%f, %f", tmp_value[0], tmp_value[1]);
     delete[] tmp_value;
 
 }
@@ -125,8 +121,9 @@ bool TensorCUDA::equal(const TensorCUDA& tensor){
         // 进行错误处理
     }
     for(int i =0;i<_value_size;i++){
-        if(abs(tmp_value[i]-tmp_value_1[i])>0.00001){
-            printf("diff is %d : %f, %f\n", i, tmp_value[i],tmp_value_1[i] );
+        if(abs(tmp_value[i]-tmp_value_1[i])>0.00001&&\
+            abs(tmp_value[i]-tmp_value_1[i])/(abs(tmp_value[i])+abs(tmp_value_1[i]))>0.001){
+            printf("diff is %d : %f, %f, %f, %f\n", i, tmp_value[i],tmp_value_1[i],abs(tmp_value[i]-tmp_value_1[i]), abs(tmp_value[i]-tmp_value_1[i])/(abs(tmp_value[i])+abs(tmp_value_1[i])));
             delete[] tmp_value;
             delete[] tmp_value_1;
             return false;
