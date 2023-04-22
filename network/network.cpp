@@ -1,10 +1,51 @@
 #include "network/network.h"
+#include "cuda_op/linear.h"
+#include "cuda_op/common.h"
+
+std::string repace_num(std::string input,int layer){
+    std::string res;
+    std::string old_str = "%d";
+    std::string str = std::to_string(layer);
+    size_t pos = input.find(old_str);
+    if (pos != std::string::npos) {
+        input.replace(pos, old_str.length(), str);
+    }
+    return input;
+}
 
 void Transformer::init_root(const std::string& model_path){
+
+    // sub op
     _word_embedding = new EmbeddingOP(model_path+"word_embedding");
     _sent_embedding = new EmbeddingOP(model_path+"sent_embedding");
     _role_embedding = new EmbeddingOP(model_path+"role_embedding");
     _pos_embedding = new EmbeddingOP(model_path+"pos_embedding",1,2,32);
+    _post_encoder_layer_norm =  new LayerNormlizeOP(model_path+"post_encoder_layer_norm_scale");
+    _matmulop  = new MatMulOP();
+    _rope_op = new RoPeOP();
+    for(int i =0; i < _layer_size; i++){
+            //params
+        _reduce_2d_sum_op.push_back(std::unique_ptr<LayerNormlizeOP>(
+                new LayerNormlizeOP(repace_num(model_path+"encoder_layer_%d_pre_att_layer_norm_scale", i))));
+        _pre_ffn_layer_norm.push_back(std::unique_ptr<LayerNormlizeOP>(
+                new LayerNormlizeOP(repace_num(model_path+"encoder_layer_%d_pre_ffn_layer_norm_scale", i))));
+
+        _query_w.push_back(std::unique_ptr<TensorCUDA>(
+            new TensorCUDA(repace_num(model_path+"encoder_layer_%d_multi_head_att_query_fc.w_0", i))));
+        _key_w.push_back(std::unique_ptr<TensorCUDA>(
+            new TensorCUDA(repace_num(model_path+"encoder_layer_%d_multi_head_att_key_fc.w_0", i))));
+        _value_w.push_back(std::unique_ptr<TensorCUDA>(
+            new TensorCUDA(repace_num(model_path+"encoder_layer_%d_multi_head_att_value_fc.w_0", i))));
+        _output_w.push_back(std::unique_ptr<TensorCUDA>(
+            new TensorCUDA(repace_num(model_path+"encoder_layer_%d_multi_head_att_output_fc.w_0", i))));
+        _ffn0_weight.push_back(std::unique_ptr<TensorCUDA>(
+            new TensorCUDA(repace_num(model_path+"encoder_layer_%d_ffn_fc_0.w_0", i))));
+        _ffn1_weight.push_back(std::unique_ptr<TensorCUDA>(
+            new TensorCUDA(repace_num(model_path+"encoder_layer_%d_ffn_fc_1.w_0", i))));
+    }
+
+    
+
 }
 
 TensorCUDA* Transformer::get_embedding_out(int* token_type_list,
@@ -39,7 +80,26 @@ TensorCUDA* Transformer::get_pos_embedding_out(int* token_type_list, int length)
     return pos_type_embedding;
 }
 
-Transformer::Transformer(const std::string& path){
+
+void Transformer::get_q_k_v(TensorCUDA& tensor, TensorCUDA& pos_type_embedding, TensorCUDA& q, TensorCUDA& k, TensorCUDA& v,int layer_index){
+
+    TensorCUDA tmp(tensor.get_shape());
+    _matmulop->process(  tensor, *_query_w[layer_index], tmp);
+    _rope_op->process(tmp,pos_type_embedding,tmp);
+    tmp.reshape_copy(q);
+   
+
+    _matmulop->process( tensor, *_key_w[layer_index], tmp);
+    _rope_op->process(tmp,pos_type_embedding,tmp);
+    tmp.reshape_copy(k);
+
+    _matmulop->process( tensor, *_value_w[layer_index], tmp);
+     tmp.reshape_copy(v);
+
+}
+
+Transformer::Transformer(const std::string& path, int layer_size){
+    _layer_size = layer_size;
     _mat_add_op =  new MatAddOP();
     init_root(path);
 }
@@ -59,4 +119,59 @@ Transformer::~Transformer(){
     if(_mat_add_op){
         delete _mat_add_op;
     }
+
+    if(_matmulop){
+        delete _matmulop;
+    }
+
+    if(_rope_op){
+        delete _rope_op;
+    }
+
+    if(_post_encoder_layer_norm){
+        delete _post_encoder_layer_norm;
+    }
+
+ 
+}
+
+void Transformer::get_attention_output(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index){
+     std::vector<int> head_shape = {32, tensor.get_shape()[0], tensor.get_shape()[1]/32};
+    TensorCUDA q(head_shape );
+    TensorCUDA k(head_shape );
+    TensorCUDA v(head_shape );
+    get_q_k_v(tensor, pos_type_embedding, q, k, v,layer_index);
+    TensorCUDA p({q.get_shape()[0],q.get_shape()[1],q.get_shape()[1]});
+    batch_matmul(q,k,p);
+    expf(p);
+    TensorCUDA attention({q.get_shape()[0],q.get_shape()[1],q.get_shape()[2]});
+    batch_matmul_without_transpose(p,v,attention);
+    TensorCUDA mean({q.get_shape()[0],q.get_shape()[1]});
+    mat_3d_reduce_sum(p, mean);
+    // transformer.
+    batch_mat_divide_mat(attention,mean);
+    q.reshape(tensor.get_shape());
+    attention.reshape_copy(q);
+    _matmulop->process(  q, *_output_w[layer_index], tensor);
+}
+
+void Transformer::encoder_layer(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index){
+    TensorCUDA result(tensor.get_shape());
+    _reduce_2d_sum_op[layer_index]->prcocess(tensor, result);
+    get_attention_output(result,pos_type_embedding,layer_index);
+    _mat_add_op->process(tensor, result,result);
+    _pre_ffn_layer_norm[layer_index]->prcocess(result, tensor);
+   TensorCUDA tmp1({result.get_shape()[0], result.get_shape()[1]*4});
+    _matmulop->process(tensor, *_ffn0_weight[layer_index],tmp1);
+    gelu(tmp1);
+    _matmulop->process(tmp1,*_ffn1_weight[layer_index],tensor);
+    _mat_add_op->process(tensor, result,tensor);
+}
+
+void Transformer::encode(TensorCUDA& tensor,TensorCUDA& pos_type_embedding){
+    for(int i=0;i<12;i++){
+        encoder_layer(tensor, pos_type_embedding, i);
+    }
+
+    _post_encoder_layer_norm->prcocess(tensor, tensor);
 }

@@ -64,8 +64,8 @@ void LayerNormlizeOP::get_reduce_mean(const TensorCUDA& input,TensorCUDA& output
   
 }
 
-void LayerNormlizeOP::get_bias(TensorCUDA& input, TensorCUDA& mean){
-    mat_reduce_vector(input, mean, _block_x, _thread_x);
+void LayerNormlizeOP::get_bias(TensorCUDA& input, TensorCUDA& mean, TensorCUDA& output){
+    mat_reduce_vector(input, mean,output, _block_x, _thread_x);
 }
 
 void LayerNormlizeOP::get_var_scalar(TensorCUDA& input, TensorCUDA& var){
@@ -77,13 +77,24 @@ void LayerNormlizeOP::normlize_scale(TensorCUDA& input, TensorCUDA& var){
 
 }
 
-void LayerNormlizeOP::prcocess(TensorCUDA& result){
+void LayerNormlizeOP::prcocess(TensorCUDA& result, TensorCUDA& output){
     std::vector<int>  emb_out_mean_shape = {result.get_shape()[0]};
     TensorCUDA emb_out_mean(emb_out_mean_shape);
     get_reduce_mean(result, emb_out_mean);
-    get_bias(result, emb_out_mean);
+    get_bias(result, emb_out_mean, output);
 
     TensorCUDA var(emb_out_mean_shape);
-    get_var_scalar(result, var);
-    normlize_scale(result, var);
+    get_var_scalar(output, var);
+    normlize_scale(output, var);
+}
+
+
+
+
+MatMulOP::MatMulOP(){
+
+}
+
+void MatMulOP::process(const TensorCUDA& left, const TensorCUDA& right,TensorCUDA& result){
+    matmul(left, right, result);
 }

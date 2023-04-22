@@ -8,6 +8,7 @@ __global__ void index_select_op(float* embedding, int* index,
             // result[threadId*length + i] =embedding[threadId*length+index[i]];
             result[threadId + i*dim] =embedding[threadId + index[i]*dim];
             // result[threadId + i*dim] = threadId + i*dim;
+            // result[threadId + i*dim] =threadId + index[i]*dim;
         }
     }
 

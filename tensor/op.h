@@ -35,7 +35,7 @@ class LayerNormlizeOP{
         int _block_x;
         int _thread_x;
         TensorCUDA* _scalar = NULL;
-        void get_bias(TensorCUDA& input, TensorCUDA& mean);
+        void get_bias(TensorCUDA& input, TensorCUDA& mean,TensorCUDA& output);
         void get_reduce_mean(const TensorCUDA&,TensorCUDA& output);
         void get_var_scalar(TensorCUDA& input, TensorCUDA& mean);
         void normlize_scale(TensorCUDA& input, TensorCUDA& var);
@@ -43,5 +43,14 @@ class LayerNormlizeOP{
     public:
         LayerNormlizeOP(const std::string& file_path, int block_x = 1, int thread_x = 1024);
         ~LayerNormlizeOP();
-        void prcocess(TensorCUDA&);
+        void prcocess(TensorCUDA&,TensorCUDA&);
+};
+
+
+
+class MatMulOP{
+    public:
+        MatMulOP();
+        void process(const TensorCUDA&,const TensorCUDA& ,TensorCUDA&);
+
 };
