@@ -1,12 +1,13 @@
 #pragma once
 #include "tensor/tensor_cpu.h"
 class TensorCUDA{
-private:
+protected:
     float* _device_value_ptr = NULL;
     std::vector<int> _shape;
     int _value_size = 0;
     std::string _name;
 public:
+    TensorCUDA();
     TensorCUDA(const TensorCPU& _tensor_cpu);
     TensorCUDA(const std::vector<int>& shape);
     ~TensorCUDA();

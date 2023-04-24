@@ -1,4 +1,5 @@
 #include <chrono>
+#include <tensor/tensor_cuda.h>
 class Timer{
   std::chrono::time_point<std::chrono::high_resolution_clock> _start;
   public:
@@ -13,3 +14,4 @@ class Timer{
        return diff.count();
     }
 };
+

@@ -1,6 +1,8 @@
 #include "tensor/tensor_cuda.h"
 #include "cuda_op/common.h"
 
+TensorCUDA::TensorCUDA(){}
+
 TensorCUDA::TensorCUDA(const TensorCPU& _tensor_cpu){
     int result=-3;
     cudaError_t cudaStatus;
