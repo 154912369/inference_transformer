@@ -21,7 +21,7 @@ public:
     bool equal(const TensorCUDA& _tensor);
     void reshape(const std::vector<int>& shape);
     void reshape_copy(TensorCUDA& result);
-    void save(std::string name);
+    void save(std::string name) const;
 };
 
 class BatchTensorCUDA{

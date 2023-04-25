@@ -215,7 +215,6 @@ void Transformer::decoder_get_attention_output(TensorCUDA& tensor,TensorCUDA& po
     batch_matmul(q,k,p);
     
     expf(p);
-    BatchTensorCUDA bp(p);
     TensorCUDA attention({q.get_shape()[0],p.get_shape()[1],v.get_shape()[2]}); //32,346,64
     batch_matmul_without_transpose(p,v,attention);
     TensorCUDA mean({p.get_shape()[0],p.get_shape()[1]});

@@ -258,6 +258,7 @@ void batch_matmul(const TensorCUDA& left,
   BatchTensorCUDA right_batch(right);
   BatchTensorCUDA result_batch(result);
 
+  
 
   cublasStatus_t cudaStatus = cublasSgemmBatched(handle, CUBLAS_OP_T,CUBLAS_OP_N, 
                                     L, M, K, &alpha, 
@@ -270,7 +271,7 @@ void batch_matmul(const TensorCUDA& left,
       // 进行错误处理
   }
   cudaDeviceSynchronize();
-
+  cublasDestroy(handle);
 }
 
 void batch_matmul_without_transpose(const TensorCUDA& left,
@@ -331,7 +332,7 @@ __global__ void max_index(float *in, int length, float *out,int *index) {
   buffer_index[threadIdx.x] = t_index;
 
   __syncthreads();
-  for (int i =THREAD_NUM>>1; i >= 32; i >>= 1) {
+  for (int i =THREAD_NUM>>1; i >= 1; i >>= 1) {
     if (threadIdx.x < i && buffer[threadIdx.x]< buffer[threadIdx.x + i]) {
       buffer[threadIdx.x] =buffer[threadIdx.x + i];
       buffer_index[threadIdx.x] = buffer_index[threadIdx.x + i];
@@ -340,19 +341,19 @@ __global__ void max_index(float *in, int length, float *out,int *index) {
   }
 
 
-  t = buffer[threadIdx.x];
-  t_index = buffer_index[threadIdx.x];
-  for (int i = 16; i >= 1; i >>= 1) {
-    if(__shfl_down_sync(0xffffffff, t, i)>t){
-        t_index = __shfl_down_sync(0xffffffff, t_index, i);
-    }else{
-        __shfl_down_sync(0xffffffff, t_index, i);
-    }
-  }
+  // t = buffer[threadIdx.x];
+  // t_index = buffer_index[threadIdx.x];
+  // for (int i = 16; i >= 1; i >>= 1) {
+  //   if(__shfl_down_sync(0xffffffff, t, i)>t){
+  //       t_index = __shfl_down_sync(0xffffffff, t_index, i);
+  //   }else{
+  //       __shfl_down_sync(0xffffffff, t_index, i);
+  //   }
+  // }
 
   if (threadIdx.x == 0) {
-      out[0] = t;
-      index[0] = t_index;
+      out[0] = buffer[0] ;
+      index[0] = buffer_index[0];
   }
   __syncthreads();
 }
@@ -361,6 +362,8 @@ __global__ void max_index(float *in, int length, float *out,int *index) {
 
 int get_last_token(const TensorCUDA& left,
             const TensorCUDA& right){
+// left.save("word_embedding");
+// right.save("hidden_out");
 
 // 创建cublas库句柄
 cublasHandle_t handle;
@@ -373,7 +376,7 @@ int K = left.get_shape()[1];
 float* result;
 float* token_score;
 int* token_id;
-float all_score[M];
+
 cudaError_t cudaStatus = cudaMalloc(&result, M* sizeof(float));
 if (cudaStatus != cudaSuccess) {
     printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
@@ -392,16 +395,17 @@ if (cudaStatus != cudaSuccess) {
 cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, 1, M, K,
             &alpha, right.get()+(right.get_size()-K), 1,left.get(), K, &beta, result, 1);
 cudaDeviceSynchronize();
-cudaMemcpy( all_score, result, M*sizeof(float), cudaMemcpyDeviceToHost);
+
 max_index<<<1,1024>>>(result, M, token_score, token_id);
+
 cudaStatus = cudaFree(result);
 if (cudaStatus != cudaSuccess) {
-    printf("cudaFree failed: %s\n", cudaGetErrorString(cudaStatus));
+    printf("cudaFree matrix score failed: %s\n", cudaGetErrorString(cudaStatus));
     // 进行错误处理
 }
 cudaStatus = cudaFree(token_score);
 if (cudaStatus != cudaSuccess) {
-    printf("cudaFree failed: %s\n", cudaGetErrorString(cudaStatus));
+    printf("cudaFree token score failed: %s\n", cudaGetErrorString(cudaStatus));
     // 进行错误处理
 }
 cudaStatus = cudaMemcpy( &M, token_id, sizeof(int), cudaMemcpyDeviceToHost);
@@ -411,7 +415,7 @@ if (cudaStatus != cudaSuccess) {
 }
 cudaStatus = cudaFree(token_id);
 if (cudaStatus != cudaSuccess) {
-    printf("cudaFree failed: %s\n", cudaGetErrorString(cudaStatus));
+    printf("cudaFree token id failed: %s\n", cudaGetErrorString(cudaStatus));
     // 进行错误处理
 }
 return M;

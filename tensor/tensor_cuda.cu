@@ -43,7 +43,7 @@ TensorCUDA::~TensorCUDA(){
     }
 }
 
-void TensorCUDA::save(std::string name){
+void TensorCUDA::save(std::string name) const{
 
     std::ofstream file("/data1/renweijie/baidu/dialogue/nlg-paddle-inference/transfer_output/"+name, std::ios::binary);
     int size = _shape.size();
@@ -197,7 +197,7 @@ BatchTensorCUDA::~BatchTensorCUDA(){
     if(_device_value_ptr){
         cudaError_t cudaStatus = cudaFree(_device_value_ptr);
         if (cudaStatus != cudaSuccess) {
-            printf("cudaFree failed: %s\n", cudaGetErrorString(cudaStatus));
+            printf("batch cudaFree failed: %s %p\n", cudaGetErrorString(cudaStatus), _device_value_ptr);
             // 进行错误处理
         }
     }
