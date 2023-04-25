@@ -20,6 +20,9 @@ int KeyValueCache::get_step(){
 
 
 TensorDynamicCUDA* KeyValueCache::incr_key_cache(TensorCUDA& step, int layer_size){
+    if(layer_size == 0){
+        _cache_step += step.get_shape()[0];
+    }
     TensorDynamicCUDA* key = key_list[layer_size].get();
     key->concat(step);
     return key;
@@ -29,5 +32,6 @@ TensorDynamicCUDA* KeyValueCache::incr_key_cache(TensorCUDA& step, int layer_siz
 TensorDynamicCUDA* KeyValueCache::incr_value_cache(TensorCUDA& step, int layer_size){
     TensorDynamicCUDA* key = value_list[layer_size].get();
     key->concat(step);
+
     return key;
 }

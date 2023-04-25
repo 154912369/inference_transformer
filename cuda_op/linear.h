@@ -35,5 +35,5 @@ void batch_matmul_without_transpose(const TensorCUDA& left,
             const TensorCUDA& right,
             TensorCUDA& result);
 
-
-
+int get_last_token(const TensorCUDA& left,
+            const TensorCUDA& right);

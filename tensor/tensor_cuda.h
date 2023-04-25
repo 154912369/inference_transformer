@@ -16,11 +16,12 @@ public:
     int get_size() const;
     float* get() const;
     const std::string& get_name() const;
-    void print() const;
+    void print(int offset_i=0, int offset_j=0) const;
     void cpu(TensorCPU& tensor_cpu) const;
     bool equal(const TensorCUDA& _tensor);
     void reshape(const std::vector<int>& shape);
     void reshape_copy(TensorCUDA& result);
+    void save(std::string name);
 };
 
 class BatchTensorCUDA{
@@ -33,7 +34,7 @@ public:
     BatchTensorCUDA(const TensorCUDA& _tensor_cpu);
     ~BatchTensorCUDA();
     float** get() const;
-    void print(int index) const;
+    void print(int index, int offset_i=0, int offset_j=0) const;
 
 };
 

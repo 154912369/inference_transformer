@@ -1,10 +1,10 @@
 #include "tensor/tensor_cuda.h"
 #include "cuda_op/common.h"
+#include  <fstream>
 
 TensorCUDA::TensorCUDA(){}
 
 TensorCUDA::TensorCUDA(const TensorCPU& _tensor_cpu){
-    int result=-3;
     cudaError_t cudaStatus;
     _shape  = _tensor_cpu.get_shape();
     _value_size = _tensor_cpu.get_size();
@@ -43,7 +43,24 @@ TensorCUDA::~TensorCUDA(){
     }
 }
 
+void TensorCUDA::save(std::string name){
 
+    std::ofstream file("/data1/renweijie/baidu/dialogue/nlg-paddle-inference/transfer_output/"+name, std::ios::binary);
+    int size = _shape.size();
+    file.write ((char *)&size, sizeof(int));
+    for(int i=0;i<_shape.size();i++){
+        file.write ((char *)&(_shape[i]), sizeof(int));
+    }
+    float* tmp_value = new float[_value_size];
+    cudaError_t cudaStatus = cudaMemcpy( tmp_value, _device_value_ptr, _value_size * sizeof(float), cudaMemcpyDeviceToHost);
+    if (cudaStatus != cudaSuccess) {
+        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+    file.write ((char *) tmp_value, _value_size * sizeof(float));
+    delete[] tmp_value;
+    file.close (); 
+}
 const std::vector<int>& TensorCUDA::get_shape() const{
     return _shape;
 }
@@ -65,7 +82,7 @@ void TensorCUDA::cpu(TensorCPU& tensor_cpu) const{
     cudaMemcpy( tensor_cpu.get(), _device_value_ptr, _value_size * sizeof(float), cudaMemcpyDeviceToHost);
 }
 
-void TensorCUDA::print() const{
+void TensorCUDA::print(int offset_i, int offset_j) const{
     float* tmp_value = new float[_value_size];
     cudaError_t cudaStatus = cudaMemcpy( tmp_value, _device_value_ptr, _value_size * sizeof(float), cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess) {
@@ -88,8 +105,8 @@ void TensorCUDA::print() const{
     first_size= first_size <5 ? first_size:5;
     int origin_second_size = _value_size/_shape[0];
     int second_size = origin_second_size <10 ?origin_second_size:10;
-    for(int i=0;i<first_size;i++){
-        for(int j=0;j<second_size ;j++){
+    for(int i= offset_i;i<first_size+ offset_i;i++){
+        for(int j=offset_j;j<second_size+offset_j;j++){
             printf("%.5f(%d,%d) ",tmp_value[i*origin_second_size +j],i,j);
         }
          printf("\n");
@@ -189,7 +206,7 @@ float** BatchTensorCUDA::get() const{
     return _device_value_ptr;
 }
 
-void BatchTensorCUDA::print(int index) const{
+void BatchTensorCUDA::print(int index, int offset_i, int offset_j) const{
     float** tmp_value_index = new float*[_shape[0]];
     float* tmp_value = new float[_value_size/_shape[0]];
     cudaError_t cudaStatus = cudaMemcpy( tmp_value_index, _device_value_ptr, _shape[0] * sizeof(float*), cudaMemcpyDeviceToHost);
@@ -218,8 +235,8 @@ void BatchTensorCUDA::print(int index) const{
     first_size= first_size <5 ? first_size:5;
     int origin_second_size = _value_size/_shape[1]/_shape[0];
     int second_size = origin_second_size <10 ?origin_second_size:10;
-    for(int i=0;i<first_size;i++){
-        for(int j=0;j<second_size ;j++){
+    for(int i=offset_i;i<first_size+offset_i;i++){
+        for(int j=offset_j;j<second_size+offset_j;j++){
             printf("%.5f(%d,%d) ",tmp_value[i*origin_second_size +j],i,j);
         }
          printf("\n");

@@ -27,6 +27,10 @@ void EmbeddingOP::process(const TensorIntCUDA& input, TensorCUDA& output){
     index_select(*_embedding, input, output, _block_x, _block_y, _thread_x);
 }
 
+TensorCUDA* EmbeddingOP::get_embedding(){
+    return  _embedding;
+}
+
 
 MatAddOP::MatAddOP(int block_x, int block_y,int thread_x){
     _block_x = block_x;

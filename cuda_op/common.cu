@@ -39,17 +39,25 @@ void reshape_copy_2d(TensorCUDA& input, TensorCUDA& result){
     reshape_copy<<<1,1024>>>(input.get(), result.get(),transpose_in[0],transpose_in[1],transpose_in[2]);
 }
 
-__global__ void expf(float *in, int length) {
+__global__ void expf(float *in, int length, int head_size,int prelength,bool is_mask) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int size = (length-1)/(gridDim.x * blockDim.x )+1;
     int start = tid*size;
     for(int i=0;i<size;i++&&start<length){
-        in[start]=expf(in[start]);
+        int index = (start%head_size)%(head_size/prelength);
+        int first = (start%head_size)/(head_size/prelength);
+        if(!is_mask|| index<=prelength+first){
+            in[start]=expf(in[start]);
+        }else{
+            in[start]=0;
+        }
         start+=1;
     }  
 }
-void expf(TensorCUDA& input){
-    expf<<<1,1024>>>(input.get(),input.get_size()); 
+void expf(TensorCUDA& input, bool is_mask){
+    int first = input.get_shape()[1]*input.get_shape()[2];
+    int second = input.get_shape()[1];
+    expf<<<1,1024>>>(input.get(),input.get_size(),first, second, is_mask); 
 }
 
 __global__ void gelu(float *in, int length) {

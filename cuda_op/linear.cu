@@ -155,7 +155,6 @@ __global__ void  mat_layer_normlize_scale(float* input, float* var, float* scala
 
         int threadId = blockIdx.x * gridDim.y * blockDim.x + blockIdx.y * blockDim.x + threadIdx.x;
 
-        float tmp = 0;
         int first_index = 0;
         int second_index = 0;
         int third_index = 0;
@@ -246,27 +245,31 @@ void batch_matmul(const TensorCUDA& left,
             const TensorCUDA& right,
             TensorCUDA& result){
               // 创建cublas库句柄
-cublasHandle_t handle;
-cublasCreate(&handle);
-float alpha =0.125;
-float beta=0.0;
-int L=left.get_shape()[1];
-int M=right.get_shape()[1];
-int K =right.get_shape()[2];
-int  N = right.get_shape()[0];
+  cublasHandle_t handle;
+  cublasCreate(&handle);
+  float alpha =0.125;
+  float beta=0.0;
+  int L=left.get_shape()[1];
+  int M=right.get_shape()[1];
+  int K =right.get_shape()[2];
+  int  N = right.get_shape()[0];
 
-BatchTensorCUDA left_batch(left);
-BatchTensorCUDA right_batch(right);
-BatchTensorCUDA result_batch(result);
+  BatchTensorCUDA left_batch(left);
+  BatchTensorCUDA right_batch(right);
+  BatchTensorCUDA result_batch(result);
 
 
-cublasSgemmBatched(handle, CUBLAS_OP_T,CUBLAS_OP_N, 
-                                  L, M, K, &alpha, 
-                                  (const float**)right_batch.get(), K, 
-                                  (const float**)left_batch.get(), K,    
-                                  &beta, 
-                                  result_batch.get(), L, N);
-cudaDeviceSynchronize();
+  cublasStatus_t cudaStatus = cublasSgemmBatched(handle, CUBLAS_OP_T,CUBLAS_OP_N, 
+                                    L, M, K, &alpha, 
+                                    (const float**)right_batch.get(), K, 
+                                    (const float**)left_batch.get(), K,    
+                                    &beta, 
+                                    result_batch.get(), L, N);
+  if (cudaStatus !=  CUBLAS_STATUS_SUCCESS) {
+      printf("failed to batch mul: %d\n", cudaStatus);
+      // 进行错误处理
+  }
+  cudaDeviceSynchronize();
 
 }
 
@@ -274,27 +277,142 @@ void batch_matmul_without_transpose(const TensorCUDA& left,
             const TensorCUDA& right,
             TensorCUDA& result){
               // 创建cublas库句柄
+  cublasHandle_t handle;
+  cublasCreate(&handle);
+  float alpha =1.0;
+  float beta=0.0;
+  int M = left.get_shape()[1];
+  int K = left.get_shape()[2];
+  int L = right.get_shape()[2];
+  int  N = right.get_shape()[0];
+
+  BatchTensorCUDA left_batch(left);
+  BatchTensorCUDA right_batch(right);
+  BatchTensorCUDA result_batch(result);
+
+
+  cublasSgemmBatched(handle, CUBLAS_OP_N,CUBLAS_OP_N, 
+                                    L, M, K, &alpha, 
+                                    (const float**)right_batch.get(), L, 
+                                    (const float**)left_batch.get(), K, 
+    
+                                    &beta, 
+                                    result_batch.get(), L, N);
+  cudaDeviceSynchronize();
+
+}
+
+// length 长度(也就是需要做sum的数量)
+// stride 实际为线程数
+// size 数量 
+// stride*size为实际需要合并的数量
+__global__ void max_index(float *in, int length, float *out,int *index) {
+  int offset = blockIdx.x * blockDim.x;
+  int tid = offset + threadIdx.x;
+
+  __shared__ float buffer[THREAD_NUM];
+  __shared__ int buffer_index[THREAD_NUM];
+  // 在上一个版本中，共享内存数组中的每一个元素仅仅保存了一个全局内存数组的数据
+  // 为了提高归约之前所做计算的比例，可以在归约之前将多个全局内存数组的数据累加到一个共享内存数组的一个元素中
+  // 如果一个线程处理相邻的几个数据，会导致全局内存的非合并访问，所以必须让相邻的线程访问相邻的数据
+  // 这就意味着同一个线程访问的数据之间有一个跨度，这里使用整个 grid 的大小作为跨度
+  float t = in[0];
+  int t_index = 0;
+  int size = (length-1)/THREAD_NUM +1;
+  for (int i = 0; i < size; i ++) {
+    if(i* THREAD_NUM + tid<length && in[i* THREAD_NUM + tid]>t){
+      t = in[i* THREAD_NUM + tid];
+      t_index = i * THREAD_NUM + tid;
+    }
+  }
+    
+  
+  buffer[threadIdx.x] = t;
+  buffer_index[threadIdx.x] = t_index;
+
+  __syncthreads();
+  for (int i =THREAD_NUM>>1; i >= 32; i >>= 1) {
+    if (threadIdx.x < i && buffer[threadIdx.x]< buffer[threadIdx.x + i]) {
+      buffer[threadIdx.x] =buffer[threadIdx.x + i];
+      buffer_index[threadIdx.x] = buffer_index[threadIdx.x + i];
+    }
+    __syncthreads();
+  }
+
+
+  t = buffer[threadIdx.x];
+  t_index = buffer_index[threadIdx.x];
+  for (int i = 16; i >= 1; i >>= 1) {
+    if(__shfl_down_sync(0xffffffff, t, i)>t){
+        t_index = __shfl_down_sync(0xffffffff, t_index, i);
+    }else{
+        __shfl_down_sync(0xffffffff, t_index, i);
+    }
+  }
+
+  if (threadIdx.x == 0) {
+      out[0] = t;
+      index[0] = t_index;
+  }
+  __syncthreads();
+}
+
+
+
+int get_last_token(const TensorCUDA& left,
+            const TensorCUDA& right){
+
+// 创建cublas库句柄
 cublasHandle_t handle;
 cublasCreate(&handle);
 float alpha =1.0;
 float beta=0.0;
-int M = left.get_shape()[1];
-int K = left.get_shape()[2];
-int L = right.get_shape()[2];
-int  N = right.get_shape()[0];
-
-BatchTensorCUDA left_batch(left);
-BatchTensorCUDA right_batch(right);
-BatchTensorCUDA result_batch(result);
-
-
-cublasSgemmBatched(handle, CUBLAS_OP_N,CUBLAS_OP_N, 
-                                  L, M, K, &alpha, 
-                                  (const float**)right_batch.get(), L, 
-                                  (const float**)left_batch.get(), K, 
-   
-                                  &beta, 
-                                  result_batch.get(), L, N);
+// 执行矩阵乘法操作
+int M = left.get_shape()[0];
+int K = left.get_shape()[1];
+float* result;
+float* token_score;
+int* token_id;
+float all_score[M];
+cudaError_t cudaStatus = cudaMalloc(&result, M* sizeof(float));
+if (cudaStatus != cudaSuccess) {
+    printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
+    // 进行错误处理
+}
+cudaStatus = cudaMalloc(&token_score, sizeof(float));
+if (cudaStatus != cudaSuccess) {
+    printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
+    // 进行错误处理
+}
+cudaStatus = cudaMalloc(&token_id, sizeof(int));
+if (cudaStatus != cudaSuccess) {
+    printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
+    // 进行错误处理
+}
+cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, 1, M, K,
+            &alpha, right.get()+(right.get_size()-K), 1,left.get(), K, &beta, result, 1);
 cudaDeviceSynchronize();
-
+cudaMemcpy( all_score, result, M*sizeof(float), cudaMemcpyDeviceToHost);
+max_index<<<1,1024>>>(result, M, token_score, token_id);
+cudaStatus = cudaFree(result);
+if (cudaStatus != cudaSuccess) {
+    printf("cudaFree failed: %s\n", cudaGetErrorString(cudaStatus));
+    // 进行错误处理
+}
+cudaStatus = cudaFree(token_score);
+if (cudaStatus != cudaSuccess) {
+    printf("cudaFree failed: %s\n", cudaGetErrorString(cudaStatus));
+    // 进行错误处理
+}
+cudaStatus = cudaMemcpy( &M, token_id, sizeof(int), cudaMemcpyDeviceToHost);
+if (cudaStatus != cudaSuccess) {
+    printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+    // 进行错误处理
+}
+cudaStatus = cudaFree(token_id);
+if (cudaStatus != cudaSuccess) {
+    printf("cudaFree failed: %s\n", cudaGetErrorString(cudaStatus));
+    // 进行错误处理
+}
+return M;
 }

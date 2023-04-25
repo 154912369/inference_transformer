@@ -2,6 +2,7 @@
 #include "cuda_op/linear.h"
 #include "cuda_op/common.h"
 
+
 std::string repace_num(std::string input,int layer){
     std::string res;
     std::string old_str = "%d";
@@ -96,6 +97,7 @@ void Transformer::get_q_k_v(TensorCUDA& tensor, TensorCUDA& pos_type_embedding, 
     _rope_op->process(*key_cache,pos_type_embedding,*key_cache);
     key_cache->reshape_copy(k);
 
+
     _matmulop->process( tensor, *_value_w[layer_index], *value_cache);
     value_cache->reshape_copy(v);
     key_value_cache.add_cache(key_cache,value_cache);
@@ -146,7 +148,7 @@ void Transformer::get_attention_output(TensorCUDA& tensor,TensorCUDA& pos_type_e
     TensorCUDA v(head_shape );
     get_q_k_v(tensor, pos_type_embedding, q, k, v,layer_index,key_value_cache);
     TensorCUDA p({q.get_shape()[0],q.get_shape()[1],q.get_shape()[1]});
-    batch_matmul(q,k,p);
+    batch_matmul(q,k,p); 
     expf(p);
     TensorCUDA attention({q.get_shape()[0],q.get_shape()[1],q.get_shape()[2]});
     batch_matmul_without_transpose(p,v,attention);
@@ -204,14 +206,17 @@ void Transformer::decode(TensorCUDA& tensor,TensorCUDA& pos_type_embedding,  Key
 void Transformer::decoder_get_attention_output(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index, KeyValueCache& key_value_cache){
     std::vector<int> head_shape = {32, tensor.get_shape()[0], tensor.get_shape()[1]/32};
     std::vector<int> kv_head_shape = {32, key_value_cache.get_step()+ tensor.get_shape()[0], tensor.get_shape()[1]/32};
-    TensorCUDA q(head_shape );
+    TensorCUDA q(head_shape );//32,346,64
     TensorCUDA k(kv_head_shape );
-    TensorCUDA v(kv_head_shape );
-    get_q_k_v(tensor, pos_type_embedding, q, k, v,layer_index,key_value_cache);
-    TensorCUDA p({q.get_shape()[0],q.get_shape()[1],k.get_shape()[1]});
+    TensorCUDA v(kv_head_shape ); //32,346*2,64
+    decoder_get_q_k_v(tensor, pos_type_embedding, q, k, v,layer_index,key_value_cache);
+    TensorCUDA p({q.get_shape()[0],q.get_shape()[1],k.get_shape()[1]}); //32,346,346*2
+
     batch_matmul(q,k,p);
+    
     expf(p);
-    TensorCUDA attention({q.get_shape()[0],p.get_shape()[1],v.get_shape()[2]});
+    BatchTensorCUDA bp(p);
+    TensorCUDA attention({q.get_shape()[0],p.get_shape()[1],v.get_shape()[2]}); //32,346,64
     batch_matmul_without_transpose(p,v,attention);
     TensorCUDA mean({p.get_shape()[0],p.get_shape()[1]});
     mat_3d_reduce_sum(p, mean);
@@ -223,20 +228,25 @@ void Transformer::decoder_get_attention_output(TensorCUDA& tensor,TensorCUDA& po
 }
 
 void Transformer::decoder_get_q_k_v(TensorCUDA& tensor, TensorCUDA& pos_type_embedding, TensorCUDA& q, TensorCUDA& k, TensorCUDA& v,int layer_index,  KeyValueCache& key_value_cache){
-
     TensorCUDA tmp(tensor.get_shape());
     _matmulop->process(  tensor, *_query_w[layer_index],tmp);
     _rope_op->process(tmp,pos_type_embedding,tmp);
     tmp.reshape_copy(q);
    
-
     _matmulop->process( tensor, *_key_w[layer_index], tmp);
     _rope_op->process(tmp,pos_type_embedding,tmp);
     TensorCUDA* key_cache = key_value_cache.incr_key_cache(tmp, layer_index);
     key_cache->reshape_copy(k);
 
+
+
     _matmulop->process( tensor, *_value_w[layer_index], tmp);
     key_cache = key_value_cache.incr_value_cache(tmp, layer_index);
     key_cache->reshape_copy(v);
 
+}
+
+
+int Transformer::predict_last_token(TensorCUDA& tensor){
+    return get_last_token(*_word_embedding->get_embedding(), tensor);
 }

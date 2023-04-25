@@ -28,6 +28,7 @@ class EmbeddingOP{
         void process(const TensorIntCUDA&, TensorCUDA& output);
         int get_dim();
         int get_size();
+        TensorCUDA* get_embedding();
 };
 
 class LayerNormlizeOP{

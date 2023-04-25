@@ -53,4 +53,6 @@ class Transformer{
         void decoder_layer(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index,KeyValueCache& key_value_cache);
         void decode(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, KeyValueCache& key_value_cache);
 
+        int predict_last_token(TensorCUDA& tensor);
+
 };
