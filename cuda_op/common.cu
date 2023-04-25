@@ -43,21 +43,46 @@ __global__ void expf(float *in, int length, int head_size,int prelength,bool is_
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int size = (length-1)/(gridDim.x * blockDim.x )+1;
     int start = tid*size;
-    for(int i=0;i<size;i++&&start<length){
-        int index = (start%head_size)%(head_size/prelength);
-        int first = (start%head_size)/(head_size/prelength);
-        if(!is_mask|| index<=prelength+first){
+    for(int i=0;i<size&&start<length;i++){
+        int index = (start%head_size)%(head_size/prelength);//最大大于prelength(0,2*prelngth)
+        int first = (start%head_size)/(head_size/prelength); //最大为prelength(0,prelngth)
+        if(!is_mask|| index+prelength>=first){
             in[start]=expf(in[start]);
         }else{
             in[start]=0;
         }
         start+=1;
     }  
+    // int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    // int size = (length-1)/(gridDim.x * blockDim.x )+1;
+    // int start = tid*size;
+    // for(int i=0;i<size;i++&&start<length){
+    //     in[start]=expf(in[start]);
+    //     start+=1;
+    // }
 }
+
+bool check_cuda_err1() {
+    cudaError_t err = cudaGetLastError();
+    if(err == cudaSuccess) {
+        return true;
+    }
+    else {
+        printf("Cuda Error: %s \n",cudaGetErrorString(err));
+        return false;
+    }
+}
+
 void expf(TensorCUDA& input, bool is_mask){
     int first = input.get_shape()[1]*input.get_shape()[2];
     int second = input.get_shape()[1];
     expf<<<1,1024>>>(input.get(),input.get_size(),first, second, is_mask); 
+    cudaError_t cudaStatus = cudaDeviceSynchronize();
+    check_cuda_err1();
+    if (cudaStatus != cudaSuccess) {
+        printf("cudaDeviceSynchronize failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
 }
 
 __global__ void gelu(float *in, int length) {
@@ -71,4 +96,14 @@ __global__ void gelu(float *in, int length) {
 }
 void gelu(TensorCUDA& input){
     gelu<<<1,1024>>>(input.get(),input.get_size()); 
+}
+
+void init_cuda(){
+    size_t result;
+    cudaDeviceGetLimit(&result, cudaLimitMallocHeapSize);
+    printf("cuda device head limit is %d\n", result);
+    cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1024*1024*1024);
+    cudaDeviceGetLimit(&result, cudaLimitMallocHeapSize);
+    printf("cuda device head limit is %d\n", result);
+    
 }

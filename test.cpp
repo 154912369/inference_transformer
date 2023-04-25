@@ -3,7 +3,7 @@
 #include "common/time.cpp"
 #include "unistd.h"
 #include <vector>
-#include "input.cpp"
+// #include "input.cpp"
 #include "cuda_op/linear.h"
 #include "cuda_op/common.h"
 #include <unordered_map>
@@ -11,7 +11,10 @@
 std::string model_path = "/data1/renweijie/baidu/dialogue/nlg-paddle-inference/params/";
 std::string root_path = "/data1/renweijie/baidu/dialogue/nlg-paddle-inference/transfer_output/";
 
-
+std::vector<int> token_ids_int = {1,999,2};
+std::vector<int> role_ids_int= {0,1,1};
+std::vector<int> pos_ids_int={0,1,2};
+std::vector<int> sent_ids_int={0,0,0};
 int main(int argc, char* argv[]){
     std::unordered_map<int, std::string> words;
     std::unordered_map<std::string, int> word2item;
@@ -34,8 +37,11 @@ int main(int argc, char* argv[]){
 
 
     int size = role_ids_int.size();
-    Transformer transformer(model_path, 1);
-
+    size= 3;
+    Transformer transformer(model_path, 32);
+    for(int i=0;i<size;i++){
+        printf("%s\n", words[token_ids_int[i]].c_str());
+    }
     // pre layer
     auto enc_out = transformer.get_embedding_out(
         token_ids_int.data(), role_ids_int.data(), sent_ids_int.data(), size
@@ -44,33 +50,34 @@ int main(int argc, char* argv[]){
     KeyValueCache key_value_cache;
     transformer.encode(*enc_out,*pos_type_embedding, key_value_cache);
 
-    // TensorCUDA tmp(std::string("/data1/renweijie/baidu/dialogue/nlg-paddle-inference/transfer_output/enc_output_first_step"));
-    // int tokenize_id = transformer.predict_last_token(*enc_out);
+
+
+    int tokenize_id = 1;
     // printf("predict last token : %d %s\n", tokenize_id,words[tokenize_id].c_str());
-    // int role_id = 1;
-    // int sentence_id = 0;
-    // while (size<300){
-    //     auto enc_out1 = transformer.get_embedding_out(
-    //         &tokenize_id, &role_id, &sentence_id, 1
-    //     );
-    //     TensorCUDA* pos_type_embedding1 = transformer.get_pos_embedding_out(&size, 1);
-    //     transformer.decode(*enc_out1,*pos_type_embedding1, key_value_cache);
-    //     tokenize_id = transformer.predict_last_token(*enc_out);
-    //     printf("%d %s\n",tokenize_id, words[tokenize_id].c_str());
-    //     size+=1;
-    // }
-    
-    auto enc_out1 = transformer.get_embedding_out(
-            token_ids_int.data(), role_ids_int.data(), sent_ids_int.data(), size
+    int role_id = 0;
+    int sentence_id = 1;
+    while (size<10){
+        auto enc_out1 = transformer.get_embedding_out(
+            &tokenize_id, &role_id, &sentence_id, 1
         );
-    TensorCUDA* pos_type_embedding1 = transformer.get_pos_embedding_out(pos_ids_int.data(), size);
-    transformer.decode(*enc_out1,*pos_type_embedding1, key_value_cache);
-    TensorCUDA tmp1(std::string("/data1/renweijie/baidu/dialogue/nlg-paddle-inference/transfer_output/enc_output_scecond_step"));
-    if( enc_out1->equal(tmp1)){
-        printf("embedding 11 equal\n");
-    }else{
-        printf("embedding is not equal\n");
+        TensorCUDA* pos_type_embedding1 = transformer.get_pos_embedding_out(&size, 1);
+        transformer.decode(*enc_out1,*pos_type_embedding1, key_value_cache);
+        tokenize_id = transformer.predict_last_token(*enc_out1);
+        printf("%d %s\n",tokenize_id, words[tokenize_id].c_str());
+        size+=1;
     }
+    
+    // auto enc_out1 = transformer.get_embedding_out(
+    //         token_ids_int.data(), role_ids_int.data(), sent_ids_int.data(), size
+    //     );
+    // TensorCUDA* pos_type_embedding1 = transformer.get_pos_embedding_out(pos_ids_int.data(), size);
+    // transformer.decode(*enc_out1,*pos_type_embedding1, key_value_cache);
+    // TensorCUDA tmp1(std::string("/data1/renweijie/baidu/dialogue/nlg-paddle-inference/transfer_output/prefix"));
+    // if( enc_out1->equal(tmp1)){
+    //     printf("embedding 11 equal\n");
+    // }else{
+    //     printf("embedding is not equal\n");
+    // }
 
     // enc_out->print();
     

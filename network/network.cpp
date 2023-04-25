@@ -106,6 +106,7 @@ void Transformer::get_q_k_v(TensorCUDA& tensor, TensorCUDA& pos_type_embedding, 
 
 Transformer::Transformer(const std::string& path, int layer_size){
     _layer_size = layer_size;
+    init_cuda();
     _mat_add_op =  new MatAddOP();
     init_root(path);
 }
@@ -144,13 +145,13 @@ Transformer::~Transformer(){
 void Transformer::get_attention_output(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index, KeyValueCache& key_value_cache){
      std::vector<int> head_shape = {32, tensor.get_shape()[0], tensor.get_shape()[1]/32};
     TensorCUDA q(head_shape );
-    TensorCUDA k(head_shape );
-    TensorCUDA v(head_shape );
+    TensorCUDA k(head_shape ); 
+    TensorCUDA v(head_shape ); //32*3*64
     get_q_k_v(tensor, pos_type_embedding, q, k, v,layer_index,key_value_cache);
     TensorCUDA p({q.get_shape()[0],q.get_shape()[1],q.get_shape()[1]});
     batch_matmul(q,k,p); 
     expf(p);
-    TensorCUDA attention({q.get_shape()[0],q.get_shape()[1],q.get_shape()[2]});
+    TensorCUDA attention({q.get_shape()[0],q.get_shape()[1],q.get_shape()[2]}); //32*3*3
     batch_matmul_without_transpose(p,v,attention);
     TensorCUDA mean({q.get_shape()[0],q.get_shape()[1]});
     mat_3d_reduce_sum(p, mean);
@@ -213,7 +214,6 @@ void Transformer::decoder_get_attention_output(TensorCUDA& tensor,TensorCUDA& po
     TensorCUDA p({q.get_shape()[0],q.get_shape()[1],k.get_shape()[1]}); //32,346,346*2
 
     batch_matmul(q,k,p);
-    
     expf(p);
     TensorCUDA attention({q.get_shape()[0],p.get_shape()[1],v.get_shape()[2]}); //32,346,64
     batch_matmul_without_transpose(p,v,attention);

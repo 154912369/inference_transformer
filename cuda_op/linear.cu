@@ -240,6 +240,16 @@ cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, M, K,
 cudaDeviceSynchronize();
 
 }
+bool check_cuda_err() {
+    cudaError_t err = cudaGetLastError();
+    if(err == cudaSuccess) {
+        return true;
+    }
+    else {
+        printf("Cuda Error: %s \n",cudaGetErrorString(err));
+        return false;
+    }
+}
 
 void batch_matmul(const TensorCUDA& left,
             const TensorCUDA& right,
@@ -258,20 +268,37 @@ void batch_matmul(const TensorCUDA& left,
   BatchTensorCUDA right_batch(right);
   BatchTensorCUDA result_batch(result);
 
-  
-
-  cublasStatus_t cudaStatus = cublasSgemmBatched(handle, CUBLAS_OP_T,CUBLAS_OP_N, 
-                                    L, M, K, &alpha, 
+  cudaDeviceSynchronize();
+  check_cuda_err();
+  cublasStatus_t cublasStatus = cublasSgemmBatched(handle, CUBLAS_OP_T,CUBLAS_OP_N, 
+                                    M, L, K, &alpha, 
                                     (const float**)right_batch.get(), K, 
                                     (const float**)left_batch.get(), K,    
                                     &beta, 
-                                    result_batch.get(), L, N);
-  if (cudaStatus !=  CUBLAS_STATUS_SUCCESS) {
-      printf("failed to batch mul: %d\n", cudaStatus);
+                                    result_batch.get(), M, N);
+  // if(L!=1&&M!=1){
+  //   printf("LM\n");
+  //   left_batch.print(0,0,0);
+  //   right_batch.print(0,0,0);
+  //   result_batch.print(0,0,0);
+  // }
+  check_cuda_err();
+  TensorCUDA result_batch1(left.get_shape());
+  if (cublasStatus !=  CUBLAS_STATUS_SUCCESS) {
+      printf("failed to batch mul: %d\n", cublasStatus);
       // 进行错误处理
   }
-  cudaDeviceSynchronize();
-  cublasDestroy(handle);
+  cudaError_t cudaStatus =  cudaDeviceSynchronize();
+  check_cuda_err();
+  if (cudaStatus !=  cudaSuccess) {
+      printf("failed to Synchronize %s\n", cudaGetErrorString(cudaStatus));
+      // 进行错误处理
+  }
+  cublasStatus= cublasDestroy(handle);
+   if (cudaStatus !=  CUBLAS_STATUS_SUCCESS) {
+      printf("failed to cublasDestroy %d\n", cublasStatus);
+      // 进行错误处理
+  }
 }
 
 void batch_matmul_without_transpose(const TensorCUDA& left,
@@ -287,8 +314,8 @@ void batch_matmul_without_transpose(const TensorCUDA& left,
   int L = right.get_shape()[2];
   int  N = right.get_shape()[0];
 
-  BatchTensorCUDA left_batch(left);
-  BatchTensorCUDA right_batch(right);
+  BatchTensorCUDA left_batch(left);// 32*3*3
+  BatchTensorCUDA right_batch(right); // 32*3*64
   BatchTensorCUDA result_batch(result);
 
 
@@ -299,7 +326,19 @@ void batch_matmul_without_transpose(const TensorCUDA& left,
     
                                     &beta, 
                                     result_batch.get(), L, N);
-  cudaDeviceSynchronize();
+  // cublasSgemmBatched(handle, CUBLAS_OP_N,CUBLAS_OP_N, 
+  //                                   L, M, K, &alpha, 
+  //                                   (const float**)right_batch.get(), L, 
+  //                                   (const float**)left_batch.get(), K, 
+    
+  //                                   &beta, 
+  //                                   result_batch.get(), L, N);
+  // cudaDeviceSynchronize();
+  cudaError_t cudaStatus = cudaDeviceSynchronize();
+if (cudaStatus != cudaSuccess) {
+    printf("cudaDeviceSynchronize failed: %s\n", cudaGetErrorString(cudaStatus));
+    // 进行错误处理
+}
 
 }
 
@@ -376,6 +415,7 @@ int K = left.get_shape()[1];
 float* result;
 float* token_score;
 int* token_id;
+float all_score[M];
 
 cudaError_t cudaStatus = cudaMalloc(&result, M* sizeof(float));
 if (cudaStatus != cudaSuccess) {
@@ -392,12 +432,21 @@ if (cudaStatus != cudaSuccess) {
     printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
     // 进行错误处理
 }
+
 cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, 1, M, K,
             &alpha, right.get()+(right.get_size()-K), 1,left.get(), K, &beta, result, 1);
-cudaDeviceSynchronize();
-
+cudaStatus = cudaDeviceSynchronize();
+if (cudaStatus != cudaSuccess) {
+    printf("cudaDeviceSynchronize failed: %s\n", cudaGetErrorString(cudaStatus));
+    // 进行错误处理
+}
 max_index<<<1,1024>>>(result, M, token_score, token_id);
+cudaStatus = cudaMemcpy( all_score, result, M*sizeof(float), cudaMemcpyDeviceToHost);
 
+if (cudaStatus != cudaSuccess) {
+    printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+    // 进行错误处理
+}
 cudaStatus = cudaFree(result);
 if (cudaStatus != cudaSuccess) {
     printf("cudaFree matrix score failed: %s\n", cudaGetErrorString(cudaStatus));
@@ -418,5 +467,6 @@ if (cudaStatus != cudaSuccess) {
     printf("cudaFree token id failed: %s\n", cudaGetErrorString(cudaStatus));
     // 进行错误处理
 }
+cublasDestroy(handle);
 return M;
 }

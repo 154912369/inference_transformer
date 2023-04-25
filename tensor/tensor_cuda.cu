@@ -195,11 +195,11 @@ BatchTensorCUDA::BatchTensorCUDA(const TensorCUDA& _tensor_cpu):_shape(_tensor_c
 
 BatchTensorCUDA::~BatchTensorCUDA(){
     if(_device_value_ptr){
-        cudaError_t cudaStatus = cudaFree(_device_value_ptr);
-        if (cudaStatus != cudaSuccess) {
-            printf("batch cudaFree failed: %s %p\n", cudaGetErrorString(cudaStatus), _device_value_ptr);
-            // 进行错误处理
-        }
+        // cudaError_t cudaStatus = cudaFree(_device_value_ptr);
+        // if (cudaStatus != cudaSuccess) {
+        //     printf("batch cudaFree failed: %s %p\n", cudaGetErrorString(cudaStatus), _device_value_ptr);
+        //     // 进行错误处理
+        // }
     }
 }
 float** BatchTensorCUDA::get() const{
