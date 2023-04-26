@@ -7,7 +7,7 @@ TensorCPU::TensorCPU(const std::string& file_path){
         }else{
             _name = file_path.substr(found+1);
         }
-        printf("%s\n",_name.data());
+        // printf("%s\n",_name.data());
         std::ifstream input(file_path.c_str(), std::ios::binary);
         int shape_size = 0;
         input.read(reinterpret_cast<char*>(&shape_size), sizeof(int));
