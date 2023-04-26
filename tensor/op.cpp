@@ -99,6 +99,6 @@ MatMulOP::MatMulOP(){
 
 }
 
-void MatMulOP::process(const TensorCUDA& left, const TensorCUDA& right,TensorCUDA& result){
-    matmul(left, right, result);
+void MatMulOP::process(const TensorCUDA& left, const TensorCUDA& right,TensorCUDA& result,cublasHandle_t& handle){
+    matmul(left, right, result, handle);
 }

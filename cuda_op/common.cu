@@ -37,6 +37,11 @@ void reshape_copy_2d(TensorCUDA& input, TensorCUDA& result){
         transpose_in[2] = result.get_shape()[2];
     }
     reshape_copy<<<1,1024>>>(input.get(), result.get(),transpose_in[0],transpose_in[1],transpose_in[2]);
+    cudaError_t cudaStatus =  cudaDeviceSynchronize();
+    if (cudaStatus !=  cudaSuccess) {
+        printf("failed to Synchronize %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
 }
 
 __global__ void expf(float *in, int length, int head_size,int prelength,bool is_mask) {
@@ -96,13 +101,18 @@ __global__ void gelu(float *in, int length) {
 }
 void gelu(TensorCUDA& input){
     gelu<<<1,1024>>>(input.get(),input.get_size()); 
+    cudaError_t cudaStatus =  cudaDeviceSynchronize();
+    if (cudaStatus !=  cudaSuccess) {
+        printf("failed to Synchronize %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
 }
 
 void init_cuda(){
     size_t result;
     cudaDeviceGetLimit(&result, cudaLimitMallocHeapSize);
     printf("cuda device head limit is %d\n", result);
-    cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1024*1024*1024);
+    cudaDeviceSetLimit(cudaLimitMallocHeapSize, 2*1024*1024*1024);
     cudaDeviceGetLimit(&result, cudaLimitMallocHeapSize);
     printf("cuda device head limit is %d\n", result);
     

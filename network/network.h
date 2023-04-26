@@ -3,6 +3,7 @@
 #include "tensor/op_second.h"
 #include "common/cache.h"
 #include <memory>
+#include <cublas_v2.h>
 class Transformer{
     EmbeddingOP* _word_embedding = NULL;
     EmbeddingOP* _sent_embedding = NULL;
@@ -38,21 +39,21 @@ class Transformer{
         TensorCUDA* get_pos_embedding_out(int* token_type_list,
                     int length);
         void init_root(const std::string& model_path);
-        void get_q_k_v(TensorCUDA& tensor,TensorCUDA& pos_type_embedding,  TensorCUDA& q, TensorCUDA& k, TensorCUDA& v, int layer_index,KeyValueCache& key_value_cache);
+        void get_q_k_v(TensorCUDA& tensor,TensorCUDA& pos_type_embedding,  TensorCUDA& q, TensorCUDA& k, TensorCUDA& v, int layer_index,KeyValueCache& key_value_cache,cublasHandle_t& handle);
 
-        void get_attention_output(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index,KeyValueCache& key_value_cache);
+        void get_attention_output(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index,KeyValueCache& key_value_cache,cublasHandle_t& handle);
 
-        void encoder_layer(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index,KeyValueCache& key_value_cache);
-        void encode(TensorCUDA& tensor,TensorCUDA& pos_type_embedding,KeyValueCache& key_value_cache);
+        void encoder_layer(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index,KeyValueCache& key_value_cache,cublasHandle_t& handle);
+        void encode(TensorCUDA& tensor,TensorCUDA& pos_type_embedding,KeyValueCache& key_value_cache,cublasHandle_t& handle);
 
 
-        void decoder_get_q_k_v(TensorCUDA& tensor,TensorCUDA& pos_type_embedding,  TensorCUDA& q, TensorCUDA& k, TensorCUDA& v, int layer_index,KeyValueCache& key_value_cache);
+        void decoder_get_q_k_v(TensorCUDA& tensor,TensorCUDA& pos_type_embedding,  TensorCUDA& q, TensorCUDA& k, TensorCUDA& v, int layer_index,KeyValueCache& key_value_cache,cublasHandle_t& handle);
 
-        void decoder_get_attention_output(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index,KeyValueCache& key_value_cache);
+        void decoder_get_attention_output(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index,KeyValueCache& key_value_cache,cublasHandle_t& handle);
 
-        void decoder_layer(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index,KeyValueCache& key_value_cache);
-        void decode(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, KeyValueCache& key_value_cache);
+        void decoder_layer(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, int layer_index,KeyValueCache& key_value_cache,cublasHandle_t& handle);
+        void decode(TensorCUDA& tensor,TensorCUDA& pos_type_embedding, KeyValueCache& key_value_cache,cublasHandle_t& handle);
 
-        int predict_last_token(TensorCUDA& tensor);
+        int predict_last_token(TensorCUDA& tensor,cublasHandle_t& handle);
 
 };

@@ -13,8 +13,18 @@ TensorCUDA::TensorCUDA(const TensorCPU& _tensor_cpu){
         printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
+    cudaStatus = cudaDeviceSynchronize();
+   if (cudaStatus != cudaSuccess) {
+        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
     cudaStatus = cudaMemcpy(_device_value_ptr, _tensor_cpu.get(), _value_size * sizeof(float), cudaMemcpyHostToDevice);
     if (cudaStatus != cudaSuccess) {
+        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+   cudaStatus = cudaDeviceSynchronize();
+   if (cudaStatus != cudaSuccess) {
         printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
@@ -22,13 +32,19 @@ TensorCUDA::TensorCUDA(const TensorCPU& _tensor_cpu){
 };
 
 TensorCUDA::TensorCUDA(const std::vector<int>& shape):_shape(shape){
+    cudaError_t cudaStatus;
     _value_size =1;
     for(int i =0;i<shape.size();i++){
         _value_size *= shape[i];
     }
-    cudaError_t cudaStatus = cudaMalloc(&_device_value_ptr, _value_size * sizeof(float));
+    cudaStatus = cudaMalloc(&_device_value_ptr, _value_size * sizeof(float));
     if (cudaStatus != cudaSuccess) {
         printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+    cudaStatus = cudaDeviceSynchronize();
+   if (cudaStatus != cudaSuccess) {
+        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     cudaStatus = cudaMemset(_device_value_ptr, 0,  _value_size * sizeof(float));
@@ -36,8 +52,16 @@ TensorCUDA::TensorCUDA(const std::vector<int>& shape):_shape(shape){
         printf("cudaMemset failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
+    cudaStatus = cudaDeviceSynchronize();
+   if (cudaStatus != cudaSuccess) {
+        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
 }
 TensorCUDA::~TensorCUDA(){
+    if(_name.find("encod") != std::string::npos){
+        printf("parser %s", _name.c_str());
+    }
     if(_device_value_ptr != NULL){
         cudaFree(_device_value_ptr);
     }

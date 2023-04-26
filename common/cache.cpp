@@ -35,3 +35,8 @@ TensorDynamicCUDA* KeyValueCache::incr_value_cache(TensorCUDA& step, int layer_s
 
     return key;
 }
+void KeyValueCache::reset(){
+    key_list.clear();
+    value_list.clear();
+    _cache_step = 0;
+}

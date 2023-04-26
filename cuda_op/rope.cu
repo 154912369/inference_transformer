@@ -32,4 +32,9 @@ rope(const TensorCUDA& input1,
     int length = input2.get_shape()[0]; 
     int head_count = input1.get_shape()[1]/ hidden_size; 
     rope<<<1,1024>>>(input1.get(), input2.get(), result.get(),length, head_count,hidden_size);
+        cudaError_t cudaStatus =  cudaDeviceSynchronize();
+    if (cudaStatus !=  cudaSuccess) {
+        printf("failed to Synchronize %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
 }

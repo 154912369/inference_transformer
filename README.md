@@ -1,8 +1,4 @@
 # inference_transformer
-$$
-C + i*{strideC} = \alpha\text{op}(A + i*{strideA})\text{op}(B + i*{strideB}) + \beta(C + i*{strideC}),\text{ for i } \in \lbrack 0,batchCount - 1\rbrack
-$$
-
-$$
-\text{op}(A) = \left\{ \begin{matrix} A & {\text{if }\textsf{transa == $\mathrm{CUBLAS\_OP\_N}$}} \\ A^{T} & {\text{if }\textsf{transa == $\mathrm{CUBLAS\_OP\_T}$}} \\ A^{H} & {\text{if }\textsf{transa == $\mathrm{CUBLAS\_OP\_C}$}} \\ \end{matrix} \right.
-$$
+* 基于transformer的预测，只对于特定模型有效。
+* 目前是单机版，后续应该会添加多机并行运行来适配大模型。
+* 编译依赖于cuda和sentencepiece，预测依赖于transformer、sentencepiece的模型。

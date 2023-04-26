@@ -16,5 +16,6 @@ public:
     int get_step();
     TensorDynamicCUDA* incr_key_cache(TensorCUDA& step, int layer_size);
     TensorDynamicCUDA* incr_value_cache(TensorCUDA& step, int layer_size);
+    void reset();
 
 };

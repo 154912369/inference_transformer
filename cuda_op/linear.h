@@ -1,5 +1,6 @@
 #pragma once
 #include "tensor/tensor_cuda.h"
+#include <cublas_v2.h>
 void mat_add(const TensorCUDA& input1,
                 const TensorCUDA& input2,
                 TensorCUDA& result,
@@ -25,15 +26,19 @@ void mat_layer_normlize_scale(const TensorCUDA& input1, const TensorCUDA& var, c
 
 void matmul(const TensorCUDA& left,
             const TensorCUDA& right,
-            TensorCUDA& result);
+            TensorCUDA& result,
+            cublasHandle_t& handle);
 
 void batch_matmul(const TensorCUDA& left,
             const TensorCUDA& right,
-            TensorCUDA& result);
+            TensorCUDA& result,
+            cublasHandle_t& handle);
 
 void batch_matmul_without_transpose(const TensorCUDA& left,
             const TensorCUDA& right,
-            TensorCUDA& result);
+            TensorCUDA& result,
+            cublasHandle_t& handle);
 
 int get_last_token(const TensorCUDA& left,
-            const TensorCUDA& right);
+            const TensorCUDA& right,
+            cublasHandle_t& handle);

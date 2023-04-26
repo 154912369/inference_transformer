@@ -23,5 +23,11 @@ void index_select(const TensorCUDA& embedding,
     dim3 threadsPerBlock(thread_x);  
     dim3 numBlocks(block_x,  block_y);
     index_select_op<<<numBlocks,threadsPerBlock>>>(_embedding_ptr, _index_ptr, _result_ptr, result.get_shape()[1],  result.get_shape()[0]);
+    cudaError_t cudaStatus =  cudaDeviceSynchronize();
+    if (cudaStatus !=  cudaSuccess) {
+        index.print();
+        printf("failed to Synchronize %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
 
 }

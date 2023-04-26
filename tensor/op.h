@@ -1,5 +1,6 @@
 #pragma once
 #include "tensor/tensor_cuda.h"
+#include <cublas_v2.h>
 
 class MatAddOP{
     int _block_x;
@@ -52,6 +53,6 @@ class LayerNormlizeOP{
 class MatMulOP{
     public:
         MatMulOP();
-        void process(const TensorCUDA&,const TensorCUDA& ,TensorCUDA&);
+        void process(const TensorCUDA&,const TensorCUDA& ,TensorCUDA&,cublasHandle_t&);
 
 };
