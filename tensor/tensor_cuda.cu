@@ -287,6 +287,25 @@ TensorIntCUDA::TensorIntCUDA(int* input, int input_length){
     }
     
 };
+
+void TensorIntCUDA::set_result(int* input){
+    cudaError_t cudaStatus = cudaMemcpy(_device_value_ptr, input, _value_size * sizeof(int), cudaMemcpyHostToDevice);
+    if (cudaStatus != cudaSuccess) {
+        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+}
+
+TensorIntCUDA::TensorIntCUDA(int input_length){
+    _shape.clear();
+    _shape.push_back(input_length);
+    _value_size = input_length;
+    cudaError_t cudaStatus = cudaMalloc(&_device_value_ptr, _value_size * sizeof(int));
+    if (cudaStatus != cudaSuccess) {
+        printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+}
 TensorIntCUDA::~TensorIntCUDA(){
     if(_device_value_ptr != NULL){
         cudaFree(_device_value_ptr);
@@ -329,5 +348,24 @@ void TensorIntCUDA::print() const{
     printf("\n");
     delete[] tmp_value;
 
+}
+
+void  TensorIntCUDA::print_dist(int rank) const{
+    int* tmp_value = new int[_value_size];
+    cudaError_t cudaStatus = cudaMemcpy( tmp_value, _device_value_ptr, _value_size * sizeof(int), cudaMemcpyDeviceToHost);
+    if (cudaStatus != cudaSuccess) {
+        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+    printf("rank %d cuda int shape is:", rank);
+    for(int i =0;i<_shape.size();i++){
+        printf("%d ",_shape[i]);
+    }
+    printf("\nrank %d: ",rank);
+    for(int i=0;i<_shape[0];i++){
+        printf("%d ",tmp_value[i]);
+    }
+    printf("\n");
+    delete[] tmp_value;
 }
 

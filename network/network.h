@@ -3,6 +3,8 @@
 #include "tensor/op_second.h"
 #include "common/cache.h"
 #include <memory>
+#include "multi/synchronize_cuda.h"
+#include "multi/synchronize_cpu.h"
 #include <cublas_v2.h>
 class Transformer{
     EmbeddingOP* _word_embedding = NULL;
@@ -14,6 +16,10 @@ class Transformer{
     MatMulOP* _matmulop  = NULL;
     RoPeOP* _rope_op = NULL;
     int _layer_size = 0;
+    SynchronizeCUDA* _synchronize_cuda = NULL;
+    // Synchronize* _synchronize = NULL;
+    SynChronize* _synchronize = NULL;
+    bool _disribute = false;
 
     std::vector<std::unique_ptr<LayerNormlizeOP>> _reduce_2d_sum_op;
     std::vector<std::unique_ptr<LayerNormlizeOP>> _pre_ffn_layer_norm; 
@@ -30,7 +36,7 @@ class Transformer{
 
 
     public:
-        Transformer(const std::string& path, int layer_size);
+        Transformer(const std::string& path, int layer_size, SynChronize* synchronize=NULL,int myRank=1, int nRanks=1, int localRank=1);
         ~Transformer();
         TensorCUDA* get_embedding_out(int* token_type_list,
                     int* role_ids_list,

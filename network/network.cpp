@@ -1,6 +1,7 @@
 #include "network/network.h"
 #include "cuda_op/linear.h"
 #include "cuda_op/common.h"
+#include<unistd.h>  
 
 
 std::string repace_num(std::string input,int layer){
@@ -54,11 +55,32 @@ TensorCUDA* Transformer::get_embedding_out(int* token_type_list,
                     int* sent_ids_list,
                     int length){
 
+            
+   
+    if(_disribute && _synchronize_cuda->get_rank() != 0){
+        length = _synchronize->get_synchronize_length();
+        printf("rank %d get length %d\n", _synchronize_cuda->get_rank() , length);
+       
+    }else{
+        if(_disribute){
+            _synchronize->set_length(length);
+        }
+    }
 
-    TensorIntCUDA token_ids(token_type_list, length);
-    TensorIntCUDA role_ids( role_ids_list, length);
-    TensorIntCUDA sent_ids(sent_ids_list, length);
-
+    TensorIntCUDA token_ids(length);
+    TensorIntCUDA role_ids( length);
+    TensorIntCUDA sent_ids(length);
+    
+    if(!_disribute || _synchronize_cuda->get_rank() == 0){
+        token_ids.set_result(token_type_list);
+        role_ids.set_result(role_ids_list);
+        sent_ids.set_result(sent_ids_list);
+    }
+    token_ids.print_dist( _synchronize_cuda->get_rank());
+    _synchronize_cuda->BroadCast(token_ids.get(), token_ids.get(), token_ids.get_size(),  ncclInt );
+    token_ids.print_dist( _synchronize_cuda->get_rank());
+    
+    _synchronize->stop_subprocess();
     TensorCUDA token_type_embedding({token_ids.get_size(), _word_embedding->get_dim()});
     TensorCUDA role_type_embedding({token_ids.get_size(), _word_embedding->get_dim()});
     TensorCUDA sent_type_embedding({token_ids.get_size(), _word_embedding->get_dim()});
@@ -104,11 +126,17 @@ void Transformer::get_q_k_v(TensorCUDA& tensor, TensorCUDA& pos_type_embedding, 
 
 }
 
-Transformer::Transformer(const std::string& path, int layer_size){
+Transformer::Transformer(const std::string& path, int layer_size,SynChronize* synchronize,int myRank, int nRanks, int localRank){
     _layer_size = layer_size;
     
     init_cuda();
     _mat_add_op =  new MatAddOP();
+    _synchronize_cuda = new SynchronizeCUDA(myRank, nRanks,localRank);
+    if(nRanks > 1){
+        _synchronize = synchronize;
+        _synchronize_cuda->syn();
+        _disribute = true;
+    }
     init_root(path);
 }
 Transformer::~Transformer(){
@@ -138,6 +166,14 @@ Transformer::~Transformer(){
 
     if(_post_encoder_layer_norm){
         delete _post_encoder_layer_norm;
+    }
+
+    if(_synchronize){
+        delete _synchronize;
+    }
+
+    if(_synchronize_cuda){
+        delete _synchronize_cuda;
     }
 
  

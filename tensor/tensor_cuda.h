@@ -46,6 +46,7 @@ private:
     std::string _name;
 public:
     TensorIntCUDA(int* input, int input_length);
+    TensorIntCUDA(int input_length);
     ~TensorIntCUDA();
 
     const std::vector<int>& get_shape() const;
@@ -53,6 +54,8 @@ public:
     const std::string& get_name() const;
     int* get() const;
     void print() const;
+    void print_dist(int rank) const;
+    void set_result(int* input);
 };
 
  
