@@ -118,7 +118,16 @@ void run_cuda(int myRank, int nRanks, int localRank, SynChronize* synronize,char
           }
             synronize->sync_get_input();
         }else{
-            synronize->wait_for_input();
+            if(synronize->wait_for_input()){
+                std::string input_str;
+                std::string result;
+                token_ids_int = {1};
+                role_ids_int= {0};
+                pos_ids_int={0};
+                sent_ids_int={0};
+                first = true;
+                key_value_cache.reset();
+            }
         }
         token_ids_int = {1};
         role_ids_int= {0};

@@ -1,4 +1,4 @@
 # inference_transformer
 * 基于transformer的预测，只对于特定模型有效。
-* 目前是单机版，后续应该会添加多机并行运行来适配大模型。
+* 支持多卡并行（多机需要添加多机的信息同步，所以不做了），但是写的多卡比单卡慢（与通讯相关，目前处理的问题比较大）
 * 编译依赖于cuda和sentencepiece，预测依赖于transformer、sentencepiece的模型。

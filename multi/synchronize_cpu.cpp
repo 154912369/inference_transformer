@@ -40,14 +40,19 @@ void SynChronize::stop_subprocess(){
             printf("process %d stop child pid %d\n",getpid(), _cpid[i]);
         }
     }
-    exit(0);
 }
 
-void SynChronize::wait_for_input(){
+bool SynChronize::wait_for_input(){
     input_size += 1;
-    while(size!=mem[2]){
+    while(input_size!=mem[2]){
         sleep(0.1);
         
+    }
+    if(mem[3]!=reset_size){
+        reset_size+=1;
+        return true;
+    }else{
+        return false;
     }
 }
 
@@ -55,3 +60,7 @@ void SynChronize::sync_get_input(){
     input_size += 1;
     mem[2] += 1;
 }
+void SynChronize::reset_cache(){
+    mem[3] += 1;
+    reset_size+=1;
+ }
