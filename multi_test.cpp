@@ -63,12 +63,7 @@ int main(int argc, char* argv[]) {
             }
         }
     }
-    if(myRank==0||myRank==3){
-        if(nRanks!=1){
-             myRank = 3-myRank;
-        }
-       
-    }
+
     localRank = myRank;
     
     synronize = new SynChronize(shared_mem, cpids, nRanks-1, myRank==0);

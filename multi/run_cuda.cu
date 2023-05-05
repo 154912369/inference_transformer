@@ -36,22 +36,10 @@
 
 void run_cuda(int myRank, int nRanks, int localRank, SynChronize* synronize,char* argv[]){
     std::string model_path = argv[1];
-    // std::string model_path = "/data1/renweijie/baidu/dialogue/nlg-paddle-inference/params/";
     Transformer transformer(model_path, 32,synronize,myRank,nRanks,localRank);
-    // sentencepiece::SentencePieceProcessor processor;
-    // std::string model_path = "/data1/renweijie/baidu/dialogue/nlg-paddle-inference/params/";
-    // auto status = processor.Load("/data1/renweijie/baidu/dialogue/nlg-paddle-inference/projects/TOD-API/spm.model");
-    // std::fstream file("/data1/renweijie/baidu/dialogue/nlg-paddle-inference/projects/TOD-API/vocab_32.addunk.txt");
-    // processor.
-    
     Input input(argv[2]);
     std::fstream file(argv[3]);
-    // if (!status.ok()) {
-    // std::cerr << status.ToString() << std::endl;
-    // // error
-    // }else{
-    //     printf("load suee");
-    // }
+
 
 
     std::unordered_map<int, std::string> words;
@@ -169,8 +157,6 @@ void run_cuda(int myRank, int nRanks, int localRank, SynChronize* synronize,char
        
         delete pos_type_embedding;
         delete enc_out;
-        // std::shared_ptr<mt::text_process_v2::TextProcessor> text_processor = std::make_shared<mt::text_process_v2::TextProcessor>();
-        // first = 
 
         int tokenize_id = 1;
         int role_id = 0;
@@ -195,45 +181,7 @@ void run_cuda(int myRank, int nRanks, int localRank, SynChronize* synronize,char
         // printf("result: %s", result.c_str());
     }
     cublasDestroy(handle);
-    // TensorCUDA*  enc_out;
-    // TensorCUDA*  pos_type_embedding;
-    // KeyValueCache key_value_cache;
-    // bool first = true;
-    // cublasHandle_t handle;
-    // cublasCreate(&handle);
-    // if(myRank==0){
-    //   std::vector<int> token_ids_int = {10000,20000,30000,40000,40001};
-    //   std::vector<int> role_ids_int= {0,1,0,0,0};
-    //   std::vector<int> pos_ids_int={0,1,2,3,0};
-    //   std::vector<int> sent_ids_int={0,0,0,0,0};
-    //   enc_out = transformer.get_embedding_out(
-    //           token_ids_int.data(), role_ids_int.data(), sent_ids_int.data(),  token_ids_int.size()
-    //       );
-    //   pos_type_embedding = transformer.get_pos_embedding_out(
-    //           pos_ids_int.data(),  token_ids_int.size()
-    //       );
-    // }else{
-    //   int* tmp;
-    //   enc_out = transformer.get_embedding_out(tmp, tmp, tmp,  0);
-    //   pos_type_embedding = transformer.get_pos_embedding_out(
-    //           tmp,  0);
-    // }
-    // transformer.encode(*enc_out,*pos_type_embedding, key_value_cache, handle);
-     
     
-    // transformer.decode(*enc_out,*pos_type_embedding, key_value_cache, handle);
-    // TensorCUDA tmp2("/data1/renweijie/baidu/dialogue/nlg-paddle-inference/transfer_output/tmp_attention");
-    // if(tmp2.equal(*enc_out)){
-    //     printf("result1 is equal");
-    // }else{
-    //     printf("result1 is not equal");
-    // }
-    // if(myRank == 0){
-    //     enc_out->print();
-    //     enc_out->save("tmp_attention");
-    // }
-
-
     
 
     

@@ -40,7 +40,7 @@ void SynchronizeCUDA::syn(){
         std::ofstream file(common_path);
         if(file.is_open()) {
            
-            file << getppid();
+            file << getpid();
             file<<"\n";
             file.write ((char *) _id.internal, sizeof(_id.internal) * sizeof(char));
             file.close();
