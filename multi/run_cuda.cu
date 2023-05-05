@@ -114,6 +114,7 @@ void run_cuda(int myRank, int nRanks, int localRank, SynChronize* synronize,char
               sent_ids_int={0};
               first = true;
               key_value_cache.reset();
+              synronize->reset_cache();
               continue;
           }
             synronize->sync_get_input();
