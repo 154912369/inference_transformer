@@ -12,9 +12,12 @@ public:
     void syn();
     ncclUniqueId& getNcclId();
     int get_rank();
+    int get_rank_size();
     void AllReduce(const void* sendbuff, void* recvbuff, size_t count,
     ncclDataType_t datatype, ncclRedOp_t op);
     void BroadCast(const void* sendbuff, void* recvbuff, size_t count, 
+    ncclDataType_t datatype,int device=0);
+    void AllGather(const void* sendbuff, void* recvbuff, size_t count, 
     ncclDataType_t datatype);
 };
 

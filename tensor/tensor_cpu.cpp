@@ -26,14 +26,14 @@ TensorCPU::TensorCPU(const std::string& file_path){
 
 TensorCPU::TensorCPU(){}
 
-TensorCPU::TensorCPU(const std::vector<int>& shape):_shape(shape){
-    _value_size =1;
-    for(int i =0;i<_shape.size();i++){
-        _value_size *= _shape[i];
-    }
-    _value  =new float[_value_size];
-    memset(_value, 0, _value_size*sizeof(float));
-}
+// TensorCPU::TensorCPU(const std::vector<int>& shape):_shape(shape){
+//     _value_size =1;
+//     for(int i =0;i<_shape.size();i++){
+//         _value_size *= _shape[i];
+//     }
+//     _value  =new float[_value_size];
+//     memset(_value, 0, _value_size*sizeof(float));
+// }
 
 TensorCPU::~TensorCPU(){
     if(_value != NULL){

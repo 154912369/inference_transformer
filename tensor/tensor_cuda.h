@@ -9,6 +9,8 @@ protected:
 public:
     TensorCUDA();
     TensorCUDA(const TensorCPU& _tensor_cpu);
+    TensorCUDA(const std::string& _tensor_cpu);
+    TensorCUDA(const std::string& _tensor_cpu, int myrank, int ranks, bool first=false);
     TensorCUDA(const std::vector<int>& shape);
     ~TensorCUDA();
 
@@ -22,6 +24,16 @@ public:
     void reshape(const std::vector<int>& shape);
     void reshape_copy(TensorCUDA& result);
     void save(std::string name) const;
+    void set_value(float* input);
+};
+
+class SubTensorCUDA: public TensorCUDA {
+    private:
+        TensorCUDA* _parent;
+        int _start;
+    public:
+        SubTensorCUDA(TensorCUDA*, std::vector<int> shape, int size);
+        ~SubTensorCUDA();
 };
 
 class BatchTensorCUDA{

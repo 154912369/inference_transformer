@@ -15,21 +15,53 @@ TensorCUDA::TensorCUDA(const TensorCPU& _tensor_cpu){
     }
     cudaStatus = cudaDeviceSynchronize();
    if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("cuda Synchronize failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     cudaStatus = cudaMemcpy(_device_value_ptr, _tensor_cpu.get(), _value_size * sizeof(float), cudaMemcpyHostToDevice);
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("TensorCUDA cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
    cudaStatus = cudaDeviceSynchronize();
    if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("Synchronize failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     
 };
+
+TensorCUDA::TensorCUDA(const std::string& data_path){
+    TensorCPU _tensor_cpu(data_path);
+    cudaError_t cudaStatus;
+    _shape  = _tensor_cpu.get_shape();
+    _value_size = _tensor_cpu.get_size();
+
+    
+    cudaStatus = cudaMalloc(&_device_value_ptr, _value_size * sizeof(float));
+    if (cudaStatus != cudaSuccess) {
+        printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+    cudaStatus = cudaDeviceSynchronize();
+   if (cudaStatus != cudaSuccess) {
+        printf("cudaMemcpy failed: %s\n",cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+
+    cudaStatus = cudaMemcpy(_device_value_ptr, _tensor_cpu.get(), _value_size* sizeof(float), cudaMemcpyHostToDevice);
+    
+    
+    if (cudaStatus != cudaSuccess) {
+        printf("rank %d cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+   cudaStatus = cudaDeviceSynchronize();
+   if (cudaStatus != cudaSuccess) {
+        printf("rank %d cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+}
 
 TensorCUDA::TensorCUDA(const std::vector<int>& shape):_shape(shape){
     cudaError_t cudaStatus;
@@ -44,7 +76,7 @@ TensorCUDA::TensorCUDA(const std::vector<int>& shape):_shape(shape){
     }
     cudaStatus = cudaDeviceSynchronize();
    if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("TensorCUDA shape cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     cudaStatus = cudaMemset(_device_value_ptr, 0,  _value_size * sizeof(float));
@@ -54,14 +86,62 @@ TensorCUDA::TensorCUDA(const std::vector<int>& shape):_shape(shape){
     }
     cudaStatus = cudaDeviceSynchronize();
    if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("Synchronize failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
 }
-TensorCUDA::~TensorCUDA(){
-    if(_name.find("encod") != std::string::npos){
-        printf("parser %s", _name.c_str());
+TensorCUDA::TensorCUDA(const std::string& data_path, int myrank, int ranks,bool first){
+    TensorCPU _tensor_cpu(data_path);
+    cudaError_t cudaStatus;
+    _shape  = _tensor_cpu.get_shape();
+    _value_size = _tensor_cpu.get_size()/ranks;
+     cudaStatus = cudaMalloc(&_device_value_ptr, _value_size * sizeof(float));
+    if (cudaStatus != cudaSuccess) {
+        printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
     }
+    cudaStatus = cudaDeviceSynchronize();
+   if (cudaStatus != cudaSuccess) {
+        printf("cudaMemcpy failed: %s\n",cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+    if(first){
+        _shape[0]=_shape[0]/ranks;
+        cudaStatus = cudaMemcpy(_device_value_ptr, _tensor_cpu.get()+_value_size*myrank, _value_size* sizeof(float), cudaMemcpyHostToDevice);
+    }else{
+        _shape[1]=_shape[1]/ranks;
+        float* tmp_value = new float[_value_size];
+        for(int i=0;i<_shape[0];i++){
+            for(int j=0;j<_shape[1];j++){
+                tmp_value[i*_shape[1]+j] = _tensor_cpu.get()[i*_tensor_cpu.get_shape()[1]+j+_shape[1]*myrank];
+            }
+        }
+
+        cudaStatus = cudaMemcpy(_device_value_ptr, tmp_value, _value_size* sizeof(float), cudaMemcpyHostToDevice);
+        delete tmp_value;
+
+
+    }
+    if (cudaStatus != cudaSuccess) {
+            printf("rank %d cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+            // 进行错误处理
+    }
+    cudaStatus = cudaDeviceSynchronize();
+    if (cudaStatus != cudaSuccess) {
+            printf("rank %d cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+            // 进行错误处理
+    }
+
+    
+    
+
+    
+   
+
+    
+
+}
+TensorCUDA::~TensorCUDA(){
     if(_device_value_ptr != NULL){
         cudaFree(_device_value_ptr);
     }
@@ -78,7 +158,7 @@ void TensorCUDA::save(std::string name) const{
     float* tmp_value = new float[_value_size];
     cudaError_t cudaStatus = cudaMemcpy( tmp_value, _device_value_ptr, _value_size * sizeof(float), cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("TensorCUDA::save cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     file.write ((char *) tmp_value, _value_size * sizeof(float));
@@ -110,7 +190,7 @@ void TensorCUDA::print(int offset_i, int offset_j) const{
     float* tmp_value = new float[_value_size];
     cudaError_t cudaStatus = cudaMemcpy( tmp_value, _device_value_ptr, _value_size * sizeof(float), cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("TensorCUDA::print cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     printf("cuda shape is:");
@@ -157,19 +237,19 @@ bool TensorCUDA::equal(const TensorCUDA& tensor){
     float* tmp_value = new float[_value_size];
     cudaError_t cudaStatus = cudaMemcpy( tmp_value, _device_value_ptr, _value_size * sizeof(float), cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("TensorCUDA::equal cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
 
     float* tmp_value_1 = new float[_value_size];
     cudaStatus = cudaMemcpy( tmp_value_1, tensor.get(), _value_size * sizeof(float), cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("TensorCUDA::equal tmp_value_1 cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     for(int i =0;i<_value_size;i++){
-        if(abs(tmp_value[i]-tmp_value_1[i])>0.056&&\
-            abs(tmp_value[i]-tmp_value_1[i])/(abs(tmp_value[i])+abs(tmp_value_1[i]))>0.1){
+        if(abs(tmp_value[i]-tmp_value_1[i])>0.00001&&\
+            abs(tmp_value[i]-tmp_value_1[i])/(abs(tmp_value[i])+abs(tmp_value_1[i]))>0.01){
             printf("diff is %d : %f, %f, %f, %f\n", i, tmp_value[i],tmp_value_1[i],abs(tmp_value[i]-tmp_value_1[i]), abs(tmp_value[i]-tmp_value_1[i])/(abs(tmp_value[i])+abs(tmp_value_1[i])));
             delete[] tmp_value;
             delete[] tmp_value_1;
@@ -189,13 +269,42 @@ void  TensorCUDA::reshape(const std::vector<int>& shape){
     if(size==_value_size ){
         _shape = shape;
     }else{
-        printf("this size is %d ,new size is %d\n, skip reshape", _value_size, size);
+        printf("this size is %d ,new size is %d\n, skip reshape\n", _value_size, size);
     }
 }
 void TensorCUDA::reshape_copy(TensorCUDA& result){
     reshape_copy_2d(*this, result );
 }
 
+void TensorCUDA::set_value(float* input){
+    cudaError_t cudaStatus = cudaMemcpy( _device_value_ptr, input, _value_size * sizeof(float), cudaMemcpyHostToDevice);
+    if (cudaStatus != cudaSuccess) {
+        printf("TensorCUDA::set_value cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+}
+
+// class SubTensorCUDA: public TensorCUDA {
+//     private:
+//         TensorCUDA* _parent;
+//     public:
+//         SubTensorCUDA();
+//         ~SubTensorCUDA();
+// }
+SubTensorCUDA::SubTensorCUDA(TensorCUDA* tensor, std::vector<int> shape, int start){
+    _parent = tensor;
+    _value_size =1;
+    for(int i =0;i<shape.size();i++){
+        _value_size *= shape[i];
+    }
+    _shape = shape;
+    _device_value_ptr = tensor->get()+start;
+    _start = start;
+
+}
+SubTensorCUDA::~SubTensorCUDA(){
+    _device_value_ptr = NULL;
+}
 BatchTensorCUDA::BatchTensorCUDA(const TensorCUDA& _tensor_cpu):_shape(_tensor_cpu.get_shape()){
     _value_size = _tensor_cpu.get_size();
     cudaError_t cudaStatus = cudaMalloc(&_device_value_ptr, _tensor_cpu.get_shape()[0]* sizeof(float*));
@@ -212,7 +321,7 @@ BatchTensorCUDA::BatchTensorCUDA(const TensorCUDA& _tensor_cpu):_shape(_tensor_c
     }
     cudaStatus = cudaMemcpy(_device_value_ptr, input,  _tensor_cpu.get_shape()[0]* sizeof(float*), cudaMemcpyHostToDevice);
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("BatchTensorCUDA::BatchTensorCUDA cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
 }
@@ -235,12 +344,12 @@ void BatchTensorCUDA::print(int index, int offset_i, int offset_j) const{
     float* tmp_value = new float[_value_size/_shape[0]];
     cudaError_t cudaStatus = cudaMemcpy( tmp_value_index, _device_value_ptr, _shape[0] * sizeof(float*), cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("BatchTensorCUDA::print first cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     cudaStatus = cudaMemcpy( tmp_value, tmp_value_index[index],_value_size/_shape[0] * sizeof(float), cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("BatchTensorCUDA::print second cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     printf("cuda shape is:");
@@ -282,7 +391,7 @@ TensorIntCUDA::TensorIntCUDA(int* input, int input_length){
     }
     cudaStatus = cudaMemcpy(_device_value_ptr, input, _value_size * sizeof(int), cudaMemcpyHostToDevice);
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("TensorIntCUDA::TensorIntCUDA cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     
@@ -291,7 +400,7 @@ TensorIntCUDA::TensorIntCUDA(int* input, int input_length){
 void TensorIntCUDA::set_result(int* input){
     cudaError_t cudaStatus = cudaMemcpy(_device_value_ptr, input, _value_size * sizeof(int), cudaMemcpyHostToDevice);
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("TensorIntCUDA::set_result cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
 }
@@ -302,7 +411,7 @@ TensorIntCUDA::TensorIntCUDA(int input_length){
     _value_size = input_length;
     cudaError_t cudaStatus = cudaMalloc(&_device_value_ptr, _value_size * sizeof(int));
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("TensorIntCUDA::TensorIntCUDA cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
 }
@@ -334,7 +443,7 @@ void TensorIntCUDA::print() const{
     int* tmp_value = new int[_value_size];
     cudaError_t cudaStatus = cudaMemcpy( tmp_value, _device_value_ptr, _value_size * sizeof(int), cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("TensorIntCUDA::print cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     printf("cuda int shape is:");
@@ -354,7 +463,7 @@ void  TensorIntCUDA::print_dist(int rank) const{
     int* tmp_value = new int[_value_size];
     cudaError_t cudaStatus = cudaMemcpy( tmp_value, _device_value_ptr, _value_size * sizeof(int), cudaMemcpyDeviceToHost);
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("TensorIntCUDA::print_dist cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     printf("rank %d cuda int shape is:", rank);

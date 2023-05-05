@@ -36,8 +36,10 @@ class Transformer{
 
 
     public:
-        Transformer(const std::string& path, int layer_size, SynChronize* synchronize=NULL,int myRank=1, int nRanks=1, int localRank=1);
+        Transformer(const std::string& path, int layer_size, SynChronize* synchronize,int myRank=1, int nRanks=1, int localRank=1);
         ~Transformer();
+        void sync_length(int length);
+        void gelu_distribute(TensorCUDA& input);
         TensorCUDA* get_embedding_out(int* token_type_list,
                     int* role_ids_list,
                     int* sent_ids_list,

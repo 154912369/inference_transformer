@@ -7,6 +7,7 @@
 SynChronize::SynChronize(int* shaired_memory, __pid_t* cpid, int cpid_size,bool  is_parent){
     mem = shaired_memory;
     size = 0;
+    input_size = 0;
     _cpid_size = cpid_size;
     _cpid=cpid;
     _is_parent = is_parent;
@@ -40,5 +41,17 @@ void SynChronize::stop_subprocess(){
         }
     }
     exit(0);
+}
 
+void SynChronize::wait_for_input(){
+    input_size += 1;
+    while(size!=mem[2]){
+        sleep(0.1);
+        
+    }
+}
+
+void SynChronize::sync_get_input(){
+    input_size += 1;
+    mem[2] += 1;
 }

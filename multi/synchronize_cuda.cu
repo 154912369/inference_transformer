@@ -40,7 +40,7 @@ void SynchronizeCUDA::syn(){
         std::ofstream file(common_path);
         if(file.is_open()) {
            
-            file << getpid();
+            file << getppid();
             file<<"\n";
             file.write ((char *) _id.internal, sizeof(_id.internal) * sizeof(char));
             file.close();
@@ -53,10 +53,11 @@ void SynchronizeCUDA::syn(){
     }else{
         sleep(1);
         int ppid = getppid();
+        int correct_pid = getpid();
         std::string line;
         int pid;
         int try_size = 1;
-        while(pid!=ppid&&try_size<10){
+        while(pid!=ppid&&try_size<10&&correct_pid!=pid){
             std::ifstream file(common_path);
             if(file.is_open()) {
                 getline(file, line);
@@ -81,6 +82,7 @@ void SynchronizeCUDA::syn(){
 
     }
     //picking a GPU based on localRank, allocate device buffers
+    printf("local rank is %d, _myRank is %d, ranks is %d\n", _localRank, _myRank, _nRanks);
     CUDACHECK(cudaSetDevice(_localRank));
       //initializing NCCL
     NCCLCHECK(ncclCommInitRank(&_comm, _nRanks, _id, _myRank));
@@ -96,10 +98,17 @@ int SynchronizeCUDA::get_rank(){
     return _myRank;
 }
 
+int SynchronizeCUDA::get_rank_size(){
+    return _nRanks;
+}
+
 
 SynchronizeCUDA::~SynchronizeCUDA(){
       //finalizing NCCL
-  ncclCommDestroy(_comm);
+      if(_nRanks>1){
+          ncclCommDestroy(_comm);
+      }
+
   printf("start to destroy rank %d\n",_myRank);
 }
 
@@ -114,10 +123,23 @@ void SynchronizeCUDA::AllReduce(const void* sendbuff, void* recvbuff, size_t cou
 }
 
 void SynchronizeCUDA::BroadCast(const void* sendbuff, void* recvbuff, size_t count, 
-    ncclDataType_t datatype){
+    ncclDataType_t datatype, int device){
+    if(_nRanks==1)return;
 
   //communicating using NCCL
-  NCCLCHECK(ncclBroadcast(sendbuff, recvbuff, count,  datatype, 0, _comm, _stream));
+  NCCLCHECK(ncclBroadcast(sendbuff, recvbuff, count,  datatype, device, _comm, _stream));
+  //completing NCCL operation by synchronizing on the CUDA stream
+  CUDACHECK(cudaStreamSynchronize(_stream));
+
+}
+
+
+void SynchronizeCUDA::AllGather(const void* sendbuff, void* recvbuff, size_t count, 
+    ncclDataType_t datatype){
+    if(_nRanks==1)return;
+
+  //communicating using NCCL
+  NCCLCHECK(ncclAllGather(sendbuff, recvbuff, count,  datatype,  _comm, _stream));
   //completing NCCL operation by synchronizing on the CUDA stream
   CUDACHECK(cudaStreamSynchronize(_stream));
 

@@ -27,7 +27,7 @@ __global__ void reshape_copy(float *in, float *out, int first, int second,int th
 
 void reshape_copy_2d(TensorCUDA& input, TensorCUDA& result){
     int  transpose_in[3];
-    if(result.get_shape().size()==2){
+    if(input.get_shape().size()==3){
         transpose_in[0] = input.get_shape()[1];
         transpose_in[1] = input.get_shape()[0];
         transpose_in[2] = input.get_shape()[2];
@@ -58,13 +58,6 @@ __global__ void expf(float *in, int length, int head_size,int prelength,bool is_
         }
         start+=1;
     }  
-    // int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    // int size = (length-1)/(gridDim.x * blockDim.x )+1;
-    // int start = tid*size;
-    // for(int i=0;i<size;i++&&start<length){
-    //     in[start]=expf(in[start]);
-    //     start+=1;
-    // }
 }
 
 bool check_cuda_err1() {
@@ -89,7 +82,9 @@ void expf(TensorCUDA& input, bool is_mask){
         // 进行错误处理
     }
 }
+void expf(TensorCUDA& input,bool is_mask,int myrank, int ranks){
 
+}
 __global__ void gelu(float *in, int length) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int size = (length-1)/(gridDim.x * blockDim.x )+1;
@@ -108,6 +103,14 @@ void gelu(TensorCUDA& input){
     }
 }
 
+void gelu(TensorCUDA& input,int start, int size){
+    gelu<<<1,1024>>>(input.get()+start, size); 
+    cudaError_t cudaStatus =  cudaDeviceSynchronize();
+    if (cudaStatus !=  cudaSuccess) {
+        printf("failed to Synchronize %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+}
 void init_cuda(){
     size_t result;
     cudaDeviceGetLimit(&result, cudaLimitMallocHeapSize);

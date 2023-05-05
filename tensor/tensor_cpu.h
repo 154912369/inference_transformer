@@ -13,7 +13,7 @@ private:
 public:
     TensorCPU();
     TensorCPU(const std::string& file_path);
-    TensorCPU(const std::vector<int>& shape);
+    //TensorCPU(const std::vector<int>& shape);
     ~TensorCPU();
 
     const std::vector<int>& get_shape() const;

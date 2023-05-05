@@ -5,7 +5,10 @@ void mat_add(const TensorCUDA& input1,
                 const TensorCUDA& input2,
                 TensorCUDA& result,
                 int block_x, int block_y, int thread_x);
-
+void mat_add(const TensorCUDA& input1,
+    const TensorCUDA& input2,
+    TensorCUDA& result,
+    int block_x, int block_y, int thread_x,int start,int end);
 void mat_2d_reduce_sum(const TensorCUDA& input1,
                 TensorCUDA& result,
                 int block_x,  int thread_x);
@@ -39,6 +42,8 @@ void batch_matmul_without_transpose(const TensorCUDA& left,
             TensorCUDA& result,
             cublasHandle_t& handle);
 
-int get_last_token(const TensorCUDA& left,
+void get_last_token(const TensorCUDA& left,
             const TensorCUDA& right,
-            cublasHandle_t& handle);
+            float* token_score,
+            int* token_id,
+            cublasHandle_t& handle,int start);

@@ -4,12 +4,12 @@
 #define THREAD_NUM 1024
 #define SAMLL_SUM_NUM 32
 __global__ void mat_add_impl(float* input1, float* input2,
-    float* output,  int step)
+    float* output,  int step,int length)
     {
 
         int threadId = blockIdx.x * gridDim.y * blockDim.x + blockIdx.y * blockDim.x + threadIdx.x;  
-        for(int i=0;i<step;i++){
-            output[threadId*step + i] = input1[threadId*step + i]+input2[threadId*step + i];
+        for(int i=threadId*step;i<step*(threadId+1)&&i<length;i++){
+            output[i] = input1[i]+input2[i];
         }
     }
 void mat_add(const TensorCUDA& input1,
@@ -18,9 +18,25 @@ void mat_add(const TensorCUDA& input1,
     int block_x, int block_y, int thread_x){
         dim3 threadsPerBlock(thread_x);  
         dim3 numBlocks(block_x,  block_y);
-        int step = input1.get_size()/( block_x*block_y*thread_x);
-        mat_add_impl<<<numBlocks,threadsPerBlock>>>(input1.get(), input2.get(), result.get(), step);
+        int step = (input1.get_size()-1)/( block_x*block_y*thread_x)+1;
+        mat_add_impl<<<numBlocks,threadsPerBlock>>>(input1.get(), input2.get(), result.get(), step, input1.get_size());
             cudaError_t cudaStatus =  cudaDeviceSynchronize();
+    if (cudaStatus !=  cudaSuccess) {
+        printf("failed to Synchronize %s\n", cudaGetErrorString(cudaStatus));
+        // 进行错误处理
+    }
+    }
+
+  void mat_add(const TensorCUDA& input1,
+    const TensorCUDA& input2,
+    TensorCUDA& result,
+    int block_x, int block_y, int thread_x,int start,int end){
+        dim3 threadsPerBlock(thread_x);  
+        dim3 numBlocks(block_x,  block_y);
+        int step = (end-start)/( block_x*block_y*thread_x)+1;
+
+        mat_add_impl<<<numBlocks,threadsPerBlock>>>(input1.get()+start, input2.get()+start, result.get()+start, step, end-start);
+    cudaError_t cudaStatus =  cudaDeviceSynchronize();
     if (cudaStatus !=  cudaSuccess) {
         printf("failed to Synchronize %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
@@ -384,7 +400,7 @@ if (cudaStatus != cudaSuccess) {
 // stride 实际为线程数
 // size 数量 
 // stride*size为实际需要合并的数量
-__global__ void max_index(float *in, int length, float *out,int *index) {
+__global__ void max_index(float *in, int length, float *out,int *index,int start) {
   int offset = blockIdx.x * blockDim.x;
   int tid = offset + threadIdx.x;
 
@@ -430,16 +446,18 @@ __global__ void max_index(float *in, int length, float *out,int *index) {
 
   if (threadIdx.x == 0) {
       out[0] = buffer[0] ;
-      index[0] = buffer_index[0];
+      index[0] = buffer_index[0]+start;
   }
   __syncthreads();
 }
 
 
 
-int get_last_token(const TensorCUDA& left,
+void get_last_token(const TensorCUDA& left,
             const TensorCUDA& right,
-            cublasHandle_t& handle){
+            float* token_score,
+            int* token_id,
+            cublasHandle_t& handle,int start){
 // left.save("word_embedding");
 // right.save("hidden_out");
 
@@ -452,8 +470,8 @@ float beta=0.0;
 int M = left.get_shape()[0];
 int K = left.get_shape()[1];
 float* result;
-float* token_score;
-int* token_id;
+
+
 float all_score[M];
 
 cudaError_t cudaStatus = cudaMalloc(&result, M* sizeof(float));
@@ -461,25 +479,20 @@ if (cudaStatus != cudaSuccess) {
     printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
     // 进行错误处理
 }
-cudaStatus = cudaMalloc(&token_score, sizeof(float));
-if (cudaStatus != cudaSuccess) {
-    printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
-    // 进行错误处理
-}
-cudaStatus = cudaMalloc(&token_id, sizeof(int));
-if (cudaStatus != cudaSuccess) {
-    printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
-    // 进行错误处理
-}
 
-cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, 1, M, K,
+
+cublasStatus_t cublasStatus = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, 1, M, K,
             &alpha, right.get()+(right.get_size()-K), 1,left.get(), K, &beta, result, 1);
+if (cublasStatus !=  CUBLAS_STATUS_SUCCESS) {
+    printf("failed to mat mul: %d\n", cublasStatus);
+    // 进行错误处理
+}
 cudaStatus = cudaDeviceSynchronize();
 if (cudaStatus != cudaSuccess) {
     printf("cudaDeviceSynchronize failed: %s\n", cudaGetErrorString(cudaStatus));
     // 进行错误处理
 }
-max_index<<<1,1024>>>(result, M, token_score, token_id);
+max_index<<<1,1024>>>(result, M, token_score, token_id,start);
 cudaStatus = cudaDeviceSynchronize();
 if (cudaStatus != cudaSuccess) {
     printf("cudaDeviceSynchronize failed: %s\n", cudaGetErrorString(cudaStatus));
@@ -488,7 +501,7 @@ if (cudaStatus != cudaSuccess) {
 cudaStatus = cudaMemcpy( all_score, result, M*sizeof(float), cudaMemcpyDeviceToHost);
 
 if (cudaStatus != cudaSuccess) {
-    printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+    printf("get_last_token cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
     // 进行错误处理
 }
 cudaStatus = cudaFree(result);
@@ -496,21 +509,5 @@ if (cudaStatus != cudaSuccess) {
     printf("cudaFree matrix score failed: %s\n", cudaGetErrorString(cudaStatus));
     // 进行错误处理
 }
-cudaStatus = cudaFree(token_score);
-if (cudaStatus != cudaSuccess) {
-    printf("cudaFree token score failed: %s\n", cudaGetErrorString(cudaStatus));
-    // 进行错误处理
-}
-cudaStatus = cudaMemcpy( &M, token_id, sizeof(int), cudaMemcpyDeviceToHost);
-if (cudaStatus != cudaSuccess) {
-    printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
-    // 进行错误处理
-}
-cudaStatus = cudaFree(token_id);
-if (cudaStatus != cudaSuccess) {
-    printf("cudaFree token id failed: %s\n", cudaGetErrorString(cudaStatus));
-    // 进行错误处理
-}
-// cublasDestroy(handle);
-return M;
+
 }

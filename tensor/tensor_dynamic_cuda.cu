@@ -42,17 +42,17 @@ void TensorDynamicCUDA::concat(TensorCUDA& other){
         float* new_device_value_ptr;
         cudaError_t cudaStatus = cudaMalloc(&new_device_value_ptr, _real_value_size * sizeof(float));
         if (cudaStatus != cudaSuccess) {
-            printf("cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
+            printf("TensorDynamicCUDA::concat cudaMalloc failed: %s\n", cudaGetErrorString(cudaStatus));
             // 进行错误处理
         }
         cudaStatus = cudaMemset(new_device_value_ptr, 0,  _real_value_size * sizeof(float));
         if (cudaStatus != cudaSuccess) {
-            printf("cudaMemset failed: %s\n", cudaGetErrorString(cudaStatus));
+            printf("TensorDynamicCUDA::concat cudaMemset failed: %s\n", cudaGetErrorString(cudaStatus));
             // 进行错误处理
         }
         cudaStatus = cudaMemcpy(new_device_value_ptr, _device_value_ptr, _value_size * sizeof(float), cudaMemcpyDeviceToDevice);
         if (cudaStatus != cudaSuccess) {
-            printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+            printf("TensorDynamicCUDA::concat cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
             // 进行错误处理
         }
         cudaFree(_device_value_ptr);
@@ -62,7 +62,7 @@ void TensorDynamicCUDA::concat(TensorCUDA& other){
     cudaError_t cudaStatus = cudaStatus = cudaMemcpy(_device_value_ptr+_value_size, other.get(), other.get_size() * sizeof(float),  cudaMemcpyDeviceToDevice);
 
     if (cudaStatus != cudaSuccess) {
-        printf("cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        printf("TensorDynamicCUDA::concat  second cudaMemcpy failed: %s\n", cudaGetErrorString(cudaStatus));
         // 进行错误处理
     }
     _value_size += other.get_size();

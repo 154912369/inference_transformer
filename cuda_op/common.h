@@ -4,4 +4,5 @@ void reshape_copy_2d(TensorCUDA& input, TensorCUDA& result);
 
 void expf(TensorCUDA& input,bool is_mask=true);
 void gelu(TensorCUDA& input);
+void gelu(TensorCUDA& input,int,int);
 void init_cuda();

@@ -4,6 +4,7 @@
 class SynChronize{
     int* mem;
     int size;
+    int input_size = 0;
 
     __pid_t* _cpid;
     int _cpid_size;
@@ -14,4 +15,6 @@ class SynChronize{
     void set_length(int length);
     int get_synchronize_length();
     void stop_subprocess();
+    void wait_for_input();
+    void sync_get_input();
 };
